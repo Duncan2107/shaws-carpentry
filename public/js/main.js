@@ -42,18 +42,56 @@ if (revealEls.length && !prefersReducedMotion && "IntersectionObserver" in windo
   revealEls.forEach((el) => el.classList.add("is-visible"));
 }
 
-// Gallery lightbox
+// Gallery lightbox. A project may hold several photos, so this doubles as a
+// carousel: arrows, arrow keys and swipe step through them.
 const lightbox = document.querySelector(".lightbox");
 if (lightbox) {
   const lightboxImg = lightbox.querySelector("img");
   const lightboxCaption = lightbox.querySelector(".lightbox__caption");
   const closeBtn = lightbox.querySelector(".lightbox__close");
+  const prevBtn = lightbox.querySelector(".lightbox__nav--prev");
+  const nextBtn = lightbox.querySelector(".lightbox__nav--next");
+
+  let photos = [];
+  let index = 0;
+  let caption = "";
   let lastFocused = null;
 
-  const openLightbox = (src, caption) => {
-    lightboxImg.src = src;
-    lightboxImg.alt = caption;
-    lightboxCaption.textContent = caption;
+  const show = (next) => {
+    if (photos.length === 0) return;
+    index = (next + photos.length) % photos.length;
+    const photo = photos[index];
+    lightboxImg.src = photo.src;
+    lightboxImg.alt = photo.alt || caption;
+    lightboxCaption.textContent =
+      photos.length > 1 ? `${caption} (${index + 1} of ${photos.length})` : caption;
+  };
+
+  const openLightbox = (item) => {
+    caption = item.querySelector("figcaption")
+      ? item.querySelector("figcaption").textContent
+      : "";
+
+    // Tiles rendered from the database carry their whole photo set.
+    photos = [];
+    const payload = item.getAttribute("data-images");
+    if (payload) {
+      try {
+        photos = JSON.parse(payload);
+      } catch (err) {
+        photos = [];
+      }
+    }
+    if (photos.length === 0) {
+      const img = item.querySelector("img");
+      photos = [{ src: img.getAttribute("src"), alt: img.getAttribute("alt") }];
+    }
+
+    const multiple = photos.length > 1;
+    prevBtn.hidden = !multiple;
+    nextBtn.hidden = !multiple;
+
+    show(0);
     lightbox.classList.add("is-open");
     lastFocused = document.activeElement;
     closeBtn.focus();
@@ -67,27 +105,56 @@ if (lightbox) {
   };
 
   document.querySelectorAll(".gallery-item").forEach((item) => {
-    const open = () => {
-      const img = item.querySelector("img");
-      const caption = item.querySelector("figcaption");
-      openLightbox(img.src, caption ? caption.textContent : img.alt);
-    };
-    item.addEventListener("click", open);
+    item.addEventListener("click", () => openLightbox(item));
     item.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        open();
+        openLightbox(item);
       }
     });
+  });
+
+  prevBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    show(index - 1);
+  });
+  nextBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    show(index + 1);
   });
 
   closeBtn.addEventListener("click", closeLightbox);
   lightbox.addEventListener("click", (e) => {
     if (e.target === lightbox) closeLightbox();
   });
+
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && lightbox.classList.contains("is-open")) closeLightbox();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (e.key === "Escape") closeLightbox();
+    if (photos.length < 2) return;
+    if (e.key === "ArrowLeft") show(index - 1);
+    if (e.key === "ArrowRight") show(index + 1);
   });
+
+  // Swipe on touch screens.
+  let touchStartX = null;
+  lightbox.addEventListener(
+    "touchstart",
+    (e) => {
+      touchStartX = e.changedTouches[0].clientX;
+    },
+    { passive: true }
+  );
+  lightbox.addEventListener(
+    "touchend",
+    (e) => {
+      if (touchStartX === null || photos.length < 2) return;
+      const delta = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(delta) > 45) show(delta < 0 ? index + 1 : index - 1);
+      touchStartX = null;
+    },
+    { passive: true }
+  );
 }
 
 // Contact form — validates, then sends the enquiry via the form service

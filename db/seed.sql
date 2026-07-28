@@ -24,23 +24,41 @@ INSERT INTO services (category, title, description, image_key, image_alt, featur
 INSERT INTO services (category, title, description, image_key, image_alt, featured, sort_order) VALUES ('commercial', 'Fire Doors', 'Certified fire doors supplied and fitted to regulation, with closers, seals and hardware done right for offices, communal areas and commercial premises.', '/Media/fire-door.jpg', 'Certified oak fire door fitted with overhead closer and intumescent seals', 0, 1);
 INSERT INTO services (category, title, description, image_key, image_alt, featured, sort_order) VALUES ('commercial', 'Metal Partitioning', 'Metal stud partitioning for offices and commercial units, built straight, insulated and ready for boarding.', '/Media/metal-partitioning.jpg', 'Metal stud partitioning with insulation in a commercial unit, mid fit-out', 0, 2);
 
--- Gallery (16 photos)
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Fitted Kitchen', '/Media/fitted-kitchen.jpg', 'Fitted shaker kitchen in deep navy with oak flooring', 1);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Fitted Bathroom', '/Media/fitted-bathroom.jpg', 'Fitted bathroom with walnut vanity unit and oak flooring', 2);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Fitted Wardrobes', '/Media/fitted-wardrobe.jpg', 'Floor-to-ceiling fitted wardrobes', 3);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Fitted Alcove Furniture', '/Media/fitted-furniture.jpg', 'Fitted oak alcove cabinets and floating shelves', 4);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Fitted Windows', '/Media/fitted-windows.jpg', 'White framed windows newly fitted in a brick wall', 5);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Doors & Finish Carpentry', '/Media/door.jpg', 'Internal timber door hung and finished', 6);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Wood Flooring', '/Media/flooring.jpg', 'Engineered oak flooring laid through a bright bay-windowed room', 7);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Wall Panelling', '/Media/panelling.jpg', 'Precisely fitted wall panelling', 8);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Wooden Partitioning', '/Media/wooden-partitioning.jpg', 'Timber stud wall partition with insulation, mid build', 9);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Timber Cladding', '/Media/cladding.jpg', 'Cedar clad home extension with grey framed glazing', 10);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Garden Room', '/Media/garden-room.jpg', 'Cedar clad garden room with sliding glass doors and a small deck', 11);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Garden Decking', '/Media/decking.jpg', 'Timber garden decking with balustrade', 12);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Fencing & Gates', '/Media/fence.jpg', 'Timber garden fencing', 13);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Soffits, Fascias & Guttering', '/Media/soffits-fascias-guttering.jpg', 'New white soffits and fascias with black guttering', 14);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Fire Doors', '/Media/fire-door.jpg', 'Certified oak fire door with overhead closer and intumescent seals', 15);
-INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Metal Partitioning', '/Media/metal-partitioning.jpg', 'Metal stud partitioning in a commercial unit, mid fit-out', 16);
+-- Gallery: 16 projects, each starting with a single photo.
+-- More photos can be added to any project from /admin, and the
+-- website then steps through them in a carousel.
+INSERT INTO gallery (caption, sort_order) VALUES ('Fitted Kitchen', 1);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/fitted-kitchen.jpg', 'Fitted shaker kitchen in deep navy with oak flooring', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Fitted Bathroom', 2);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/fitted-bathroom.jpg', 'Fitted bathroom with walnut vanity unit and oak flooring', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Fitted Wardrobes', 3);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/fitted-wardrobe.jpg', 'Floor-to-ceiling fitted wardrobes', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Fitted Alcove Furniture', 4);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/fitted-furniture.jpg', 'Fitted oak alcove cabinets and floating shelves', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Fitted Windows', 5);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/fitted-windows.jpg', 'White framed windows newly fitted in a brick wall', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Doors & Finish Carpentry', 6);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/door.jpg', 'Internal timber door hung and finished', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Wood Flooring', 7);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/flooring.jpg', 'Engineered oak flooring laid through a bright bay-windowed room', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Wall Panelling', 8);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/panelling.jpg', 'Precisely fitted wall panelling', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Wooden Partitioning', 9);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/wooden-partitioning.jpg', 'Timber stud wall partition with insulation, mid build', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Timber Cladding', 10);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/cladding.jpg', 'Cedar clad home extension with grey framed glazing', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Garden Room', 11);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/garden-room.jpg', 'Cedar clad garden room with sliding glass doors and a small deck', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Garden Decking', 12);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/decking.jpg', 'Timber garden decking with balustrade', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Fencing & Gates', 13);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/fence.jpg', 'Timber garden fencing', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Soffits, Fascias & Guttering', 14);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/soffits-fascias-guttering.jpg', 'New white soffits and fascias with black guttering', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Fire Doors', 15);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/fire-door.jpg', 'Certified oak fire door with overhead closer and intumescent seals', 1);
+INSERT INTO gallery (caption, sort_order) VALUES ('Metal Partitioning', 16);
+INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES (last_insert_rowid(), '/Media/metal-partitioning.jpg', 'Metal stud partitioning in a commercial unit, mid fit-out', 1);
 
 -- Contact settings
 INSERT INTO settings (key, value) VALUES ('areas_commercial', 'Commercial work across Sussex, Kent and London');

@@ -33,6 +33,11 @@ run_worker_first = [
 [observability]
 enabled = true
 
+# Gives the Worker its own deployment id, which is used to version the CSS and
+# JS URLs so a browser can never run yesterday's code against today's markup.
+[version_metadata]
+binding = "CF_VERSION"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "shaws-carpentry"

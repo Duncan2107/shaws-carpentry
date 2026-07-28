@@ -20,16 +20,23 @@ export function esc(value) {
 
 /** Fetch every piece of content a page might need, in one round of queries. */
 export async function loadContent(env) {
-  const [services, gallery, testimonials, settings] = await env.DB.batch([
+  const [services, gallery, galleryImages, testimonials, settings] = await env.DB.batch([
     env.DB.prepare(
       `SELECT category, title, description, image_key, image_alt, featured, sort_order
          FROM services WHERE published = 1
         ORDER BY category, sort_order, id`
     ),
     env.DB.prepare(
-      `SELECT caption, image_key, image_alt
+      `SELECT id, caption
          FROM gallery WHERE published = 1
         ORDER BY sort_order, id`
+    ),
+    env.DB.prepare(
+      `SELECT gi.gallery_id, gi.image_key, gi.image_alt
+         FROM gallery_images gi
+         JOIN gallery g ON g.id = gi.gallery_id
+        WHERE g.published = 1
+        ORDER BY gi.gallery_id, gi.sort_order, gi.id`
     ),
     env.DB.prepare(
       `SELECT quote, author_name, author_town
@@ -42,9 +49,21 @@ export async function loadContent(env) {
   const setting = {};
   for (const row of settings.results) setting[row.key] = row.value;
 
+  // Attach each project's photos, in order. A project with no photos is
+  // skipped rather than rendered as an empty tile.
+  const imagesByGallery = new Map();
+  for (const row of galleryImages.results) {
+    if (!imagesByGallery.has(row.gallery_id)) imagesByGallery.set(row.gallery_id, []);
+    imagesByGallery.get(row.gallery_id).push({ src: row.image_key, alt: row.image_alt });
+  }
+
+  const galleryProjects = gallery.results
+    .map((project) => ({ ...project, images: imagesByGallery.get(project.id) || [] }))
+    .filter((project) => project.images.length > 0);
+
   return {
     services: services.results,
-    gallery: gallery.results,
+    gallery: galleryProjects,
     testimonials: testimonials.results,
     setting,
   };
@@ -114,13 +133,26 @@ export function featuredServices(content) {
 export function galleryGrid(content) {
   return (
     content.gallery
-      .map(
-        (g) => `
-          <figure class="gallery-item reveal" tabindex="0" role="button" aria-label="View larger: ${esc(g.caption)}">
-            <img src="${esc(g.image_key)}" alt="${esc(g.image_alt)}" loading="lazy">
+      .map((g) => {
+        const cover = g.images[0];
+        const count = g.images.length;
+        // The whole set travels with the tile so the carousel can open
+        // instantly without another request.
+        const payload = esc(JSON.stringify(g.images));
+        const label =
+          count > 1
+            ? `View ${count} photos: ${g.caption}`
+            : `View larger: ${g.caption}`;
+        const badge =
+          count > 1
+            ? `\n            <span class="gallery-item__count">${count} photos</span>`
+            : '';
+        return `
+          <figure class="gallery-item reveal" tabindex="0" role="button" aria-label="${esc(label)}" data-images="${payload}">
+            <img src="${esc(cover.src)}" alt="${esc(cover.alt)}" loading="lazy">${badge}
             <figcaption>${esc(g.caption)}</figcaption>
-          </figure>`
-      )
+          </figure>`;
+      })
       .join('') + '\n        '
   );
 }

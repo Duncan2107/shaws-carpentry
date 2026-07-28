@@ -437,6 +437,75 @@ body.admin {
   gap: var(--space-3);
 }
 
+/* Multi-photo editor for gallery projects */
+.admin-photos {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-photo {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  gap: 0.625rem;
+  align-items: start;
+  padding: 0.625rem;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.admin-photo__thumb {
+  width: 4.5rem;
+  height: 3.25rem;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--white);
+}
+
+.admin-photo__body {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.admin-photo__select,
+.admin-photo__alt {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  padding: 0.5rem 0.625rem;
+  min-height: 42px;
+  width: 100%;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.admin-photo__actions {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: stretch;
+}
+
+.admin-photo__actions .admin-btn-small {
+  min-height: 34px;
+  padding: 0.25rem 0.5rem;
+}
+
+@media (max-width: 40rem) {
+  .admin-photo {
+    grid-template-columns: 1fr;
+  }
+  .admin-photo__thumb {
+    width: 100%;
+    height: 7rem;
+  }
+  .admin-photo__actions {
+    grid-auto-flow: column;
+  }
+}
+
 .admin-thumb-preview {
   width: 100%;
   max-height: 11rem;

@@ -29,10 +29,10 @@ const COLLECTIONS = {
   },
   gallery: {
     table: 'gallery',
+    // Photos are handled separately: see replaceGalleryImages.
+    hasImages: true,
     fields: {
       caption: { type: 'text', required: true, max: 120 },
-      image_key: { type: 'text', required: true, max: 300 },
-      image_alt: { type: 'text', max: 300, default: '' },
       sort_order: { type: 'int', default: 0 },
       published: { type: 'bool', default: 1 },
     },
@@ -97,16 +97,66 @@ function coerce(name, spec, raw, { partial }) {
   }
 }
 
-function buildRow(collection, body, { partial }) {
+function buildRow(collection, body, { partial, allowEmpty }) {
   const row = {};
   for (const [name, spec] of Object.entries(collection.fields)) {
     const value = coerce(name, spec, body[name], { partial });
     if (value !== undefined) row[name] = value;
   }
-  if (partial && Object.keys(row).length === 0) {
+  if (partial && !allowEmpty && Object.keys(row).length === 0) {
     throw new ValidationError('Nothing to update.');
   }
   return row;
+}
+
+/**
+ * Replaces a project's photos with the supplied list, in the given order.
+ *
+ * The admin always sends the complete set, so this is a delete-then-insert
+ * rather than a diff. Simpler, and it makes reordering fall out for free.
+ */
+async function replaceGalleryImages(env, galleryId, images) {
+  if (!Array.isArray(images)) return;
+
+  const cleaned = images
+    .map((image) => ({
+      image_key: String(image && image.image_key ? image.image_key : '').trim(),
+      image_alt: String(image && image.image_alt ? image.image_alt : '').trim(),
+    }))
+    .filter((image) => image.image_key);
+
+  if (cleaned.length === 0) {
+    throw new ValidationError('A photo project needs at least one photo.');
+  }
+
+  const statements = [
+    env.DB.prepare('DELETE FROM gallery_images WHERE gallery_id = ?').bind(galleryId),
+  ];
+  cleaned.forEach((image, i) => {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order)
+         VALUES (?, ?, ?, ?)`
+      ).bind(galleryId, image.image_key, image.image_alt, i + 1)
+    );
+  });
+
+  await env.DB.batch(statements);
+}
+
+async function attachGalleryImages(env, projects) {
+  if (projects.length === 0) return projects;
+  const { results } = await env.DB.prepare(
+    `SELECT gallery_id, id, image_key, image_alt, sort_order
+       FROM gallery_images ORDER BY gallery_id, sort_order, id`
+  ).all();
+
+  const byProject = new Map();
+  for (const row of results) {
+    if (!byProject.has(row.gallery_id)) byProject.set(row.gallery_id, []);
+    byProject.get(row.gallery_id).push(row);
+  }
+  return projects.map((p) => ({ ...p, images: byProject.get(p.id) || [] }));
 }
 
 async function listAll(env) {
@@ -122,7 +172,7 @@ async function listAll(env) {
 
   return {
     services: services.results,
-    gallery: gallery.results,
+    gallery: await attachGalleryImages(env, gallery.results),
     testimonials: testimonials.results,
     settings: setting,
   };
@@ -134,7 +184,7 @@ async function listPhotos(env) {
 
   const rows = await env.DB.batch([
     env.DB.prepare('SELECT DISTINCT image_key FROM services WHERE image_key IS NOT NULL'),
-    env.DB.prepare('SELECT DISTINCT image_key FROM gallery WHERE image_key IS NOT NULL'),
+    env.DB.prepare('SELECT DISTINCT image_key FROM gallery_images'),
   ]);
   for (const result of rows) {
     for (const row of result.results) if (row.image_key) seen.add(row.image_key);
@@ -217,7 +267,8 @@ export async function handleApi(request, env, path) {
     }
 
     if (method === 'POST') {
-      const row = buildRow(collection, await request.json(), { partial: false });
+      const body = await request.json();
+      const row = buildRow(collection, body, { partial: false });
       const columns = Object.keys(row);
       const placeholders = columns.map(() => '?').join(', ');
       const result = await env.DB.prepare(
@@ -225,6 +276,16 @@ export async function handleApi(request, env, path) {
       )
         .bind(...columns.map((c) => row[c]))
         .first();
+
+      if (collection.hasImages) {
+        try {
+          await replaceGalleryImages(env, result.id, body.images);
+        } catch (err) {
+          // Do not leave a project behind with no photos to show.
+          await env.DB.prepare('DELETE FROM gallery WHERE id = ?').bind(result.id).run();
+          throw err;
+        }
+      }
       return json({ item: result }, 201);
     }
 
@@ -234,21 +295,44 @@ export async function handleApi(request, env, path) {
     }
 
     if (method === 'PUT' || method === 'PATCH') {
-      const row = buildRow(collection, await request.json(), { partial: true });
-      const assignments = Object.keys(row)
-        .map((c) => `${c} = ?`)
-        .join(', ');
-      const result = await env.DB.prepare(
-        `UPDATE ${collection.table} SET ${assignments}, updated_at = datetime('now')
-          WHERE id = ? RETURNING *`
-      )
-        .bind(...Object.keys(row).map((c) => row[c]), numericId)
-        .first();
+      const body = await request.json();
+      // A gallery edit may change only the photos, which is not "nothing".
+      const row = buildRow(collection, body, {
+        partial: true,
+        allowEmpty: collection.hasImages && Array.isArray(body.images),
+      });
+
+      let result;
+      if (Object.keys(row).length > 0) {
+        const assignments = Object.keys(row)
+          .map((c) => `${c} = ?`)
+          .join(', ');
+        result = await env.DB.prepare(
+          `UPDATE ${collection.table} SET ${assignments}, updated_at = datetime('now')
+            WHERE id = ? RETURNING *`
+        )
+          .bind(...Object.keys(row).map((c) => row[c]), numericId)
+          .first();
+      } else {
+        result = await env.DB.prepare(`SELECT * FROM ${collection.table} WHERE id = ?`)
+          .bind(numericId)
+          .first();
+      }
       if (!result) return json({ error: 'Not found.' }, 404);
+
+      if (collection.hasImages && Array.isArray(body.images)) {
+        await replaceGalleryImages(env, numericId, body.images);
+      }
       return json({ item: result });
     }
 
     if (method === 'DELETE') {
+      // Remove the photos first: D1 does not enforce the cascade by default.
+      if (collection.hasImages) {
+        await env.DB.prepare('DELETE FROM gallery_images WHERE gallery_id = ?')
+          .bind(numericId)
+          .run();
+      }
       const result = await env.DB.prepare(
         `DELETE FROM ${collection.table} WHERE id = ? RETURNING id`
       )

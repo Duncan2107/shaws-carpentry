@@ -81,9 +81,8 @@
     ],
     gallery: [
       { name: 'caption', label: 'Caption', type: 'text', required: true },
-      { name: 'image_key', label: 'Photo', type: 'photo', required: true },
-      { name: 'image_alt', label: 'Photo description', type: 'text',
-        hint: 'Describes the photo for people using a screen reader.' },
+      { name: 'images', label: 'Photos', type: 'images',
+        hint: 'Add as many as you like. The first is the cover shown on the Our Work page, and visitors swipe or click through the rest.' },
       { name: 'published', label: 'Visible on the website', type: 'check' },
     ],
     testimonials: [
@@ -103,23 +102,34 @@
 
   /* -------------------------------------------------------------- render */
 
+  function coverOf(item) {
+    if (item.images && item.images.length) return item.images[0].image_key;
+    return item.image_key || '';
+  }
+
   function itemRow(collection, item, index, total) {
     var t = TITLES[collection];
     var title = item[t.key] || '(untitled)';
+    var photoCount = item.images ? item.images.length : 0;
     var meta = collection === 'services' ? item.description
-      : collection === 'gallery' ? (item.image_alt || item.image_key)
+      : collection === 'gallery'
+        ? (photoCount === 1 ? '1 photo' : photoCount + ' photos')
       : item.quote;
 
     var badges = '';
     if (collection === 'services' && item.featured) {
       badges += '<span class="admin-item__badge admin-item__badge--featured">Home page</span>';
     }
+    if (collection === 'gallery' && photoCount > 1) {
+      badges += '<span class="admin-item__badge admin-item__badge--featured">Carousel</span>';
+    }
     if (!item.published) {
       badges += '<span class="admin-item__badge admin-item__badge--hidden">Hidden</span>';
     }
 
-    var thumb = item.image_key
-      ? '<img class="admin-item__thumb" src="' + esc(item.image_key) + '" alt="">'
+    var cover = coverOf(item);
+    var thumb = cover
+      ? '<img class="admin-item__thumb" src="' + esc(cover) + '" alt="">'
       : '<span class="admin-item__thumb admin-item__thumb--empty"></span>';
 
     return '' +
@@ -173,9 +183,92 @@
 
   /* -------------------------------------------------------------- editor */
 
+  /* ---- multi-photo editor (gallery projects) ---- */
+
+  var draftImages = [];
+
+  function photoOptions(selected) {
+    return ['<option value="">Choose a photo&hellip;</option>'].concat(
+      state.photos.map(function (p) {
+        return '<option value="' + esc(p) + '"' + (p === selected ? ' selected' : '') + '>' +
+          esc(p.replace(/^\/Media\//, '').replace(/^\/img\//, 'uploaded: ')) + '</option>';
+      })
+    ).join('');
+  }
+
+  function renderDraftImages() {
+    var host = document.getElementById('images-list');
+    if (!host) return;
+
+    if (!draftImages.length) {
+      host.innerHTML = '<p class="admin-empty">No photos yet. Add at least one.</p>';
+      return;
+    }
+
+    host.innerHTML = draftImages.map(function (img, i) {
+      return '' +
+        '<div class="admin-photo" data-i="' + i + '">' +
+          '<img class="admin-photo__thumb" src="' + esc(img.image_key) + '" alt="">' +
+          '<div class="admin-photo__body">' +
+            '<select class="admin-photo__select" data-field="image_key">' + photoOptions(img.image_key) + '</select>' +
+            '<input class="admin-photo__alt" data-field="image_alt" type="text" ' +
+              'placeholder="Describe this photo (for screen readers)" value="' + esc(img.image_alt || '') + '">' +
+            (i === 0 ? '<p class="admin-hint">Cover photo, shown on the Our Work page.</p>' : '') +
+          '</div>' +
+          '<div class="admin-photo__actions">' +
+            '<button type="button" class="admin-btn-small" data-photo="up"' + (i === 0 ? ' disabled' : '') + ' aria-label="Move photo up">&uarr;</button>' +
+            '<button type="button" class="admin-btn-small" data-photo="down"' + (i === draftImages.length - 1 ? ' disabled' : '') + ' aria-label="Move photo down">&darr;</button>' +
+            '<button type="button" class="admin-btn-small admin-btn-small--danger" data-photo="remove" aria-label="Remove photo">Remove</button>' +
+          '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  // Delegated so it keeps working as rows are re-rendered.
+  editorFields.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-photo]');
+    if (btn) {
+      e.preventDefault();
+      var row = btn.closest('.admin-photo');
+      var i = Number(row.getAttribute('data-i'));
+      var action = btn.getAttribute('data-photo');
+      if (action === 'remove') draftImages.splice(i, 1);
+      if (action === 'up' && i > 0) draftImages.splice(i - 1, 0, draftImages.splice(i, 1)[0]);
+      if (action === 'down' && i < draftImages.length - 1) {
+        draftImages.splice(i + 1, 0, draftImages.splice(i, 1)[0]);
+      }
+      renderDraftImages();
+      return;
+    }
+
+    if (e.target.id === 'images-add') {
+      e.preventDefault();
+      draftImages.push({ image_key: state.photos[0] || '', image_alt: '' });
+      renderDraftImages();
+    }
+  });
+
+  editorFields.addEventListener('input', function (e) {
+    var row = e.target.closest('.admin-photo');
+    if (!row) return;
+    var i = Number(row.getAttribute('data-i'));
+    var field = e.target.getAttribute('data-field');
+    if (!field || !draftImages[i]) return;
+    draftImages[i][field] = e.target.value;
+    if (field === 'image_key') {
+      row.querySelector('.admin-photo__thumb').src = e.target.value;
+    }
+  });
+
   function fieldHtml(field, value) {
     var id = 'f-' + field.name;
     var hint = field.hint ? '<p class="admin-hint">' + esc(field.hint) + '</p>' : '';
+
+    if (field.type === 'images') {
+      return '<div class="admin-field"><label>' + esc(field.label) + '</label>' + hint +
+        '<div id="images-list" class="admin-photos"></div>' +
+        '<button type="button" class="admin-btn-small" id="images-add">Add another photo</button></div>';
+    }
 
     if (field.type === 'check') {
       return '<div class="admin-check">' +
@@ -224,9 +317,17 @@
       ? { category: 'domestic', published: 1 }
       : collection === 'gallery' ? { published: 1 } : { published: 0 });
 
+    draftImages = (item && item.images ? item.images : []).map(function (img) {
+      return { image_key: img.image_key, image_alt: img.image_alt || '' };
+    });
+    if (collection === 'gallery' && draftImages.length === 0) {
+      draftImages = [{ image_key: state.photos[0] || '', image_alt: '' }];
+    }
+
     editorFields.innerHTML = FIELDS[collection]
       .map(function (f) { return fieldHtml(f, defaults[f.name]); })
       .join('');
+    renderDraftImages();
 
     editor.showModal();
   }
@@ -260,10 +361,20 @@
     var collection = editing.collection;
     var body = {};
     FIELDS[collection].forEach(function (field) {
+      if (field.type === 'images') {
+        body.images = draftImages.filter(function (img) { return img.image_key; });
+        return;
+      }
       var input = editorForm.elements[field.name];
       if (!input) return;
       body[field.name] = field.type === 'check' ? input.checked : input.value;
     });
+
+    if (body.images && body.images.length === 0) {
+      editorError.textContent = 'Add at least one photo before saving.';
+      editorError.hidden = false;
+      return;
+    }
 
     if (editing.id === null) {
       var siblings = collection === 'services'

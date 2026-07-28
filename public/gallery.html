@@ -165,12 +165,18 @@
     </div>
   </footer>
 
-  <!-- Lightbox -->
-  <div class="lightbox" role="dialog" aria-modal="true" aria-label="Enlarged project photo">
+  <!-- Lightbox / carousel -->
+  <div class="lightbox" role="dialog" aria-modal="true" aria-label="Project photos">
     <button class="lightbox__close" aria-label="Close photo">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
+    <button class="lightbox__nav lightbox__nav--prev" aria-label="Previous photo" hidden>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
     <img src="" alt="">
+    <button class="lightbox__nav lightbox__nav--next" aria-label="Next photo" hidden>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
     <p class="lightbox__caption"></p>
   </div>
 

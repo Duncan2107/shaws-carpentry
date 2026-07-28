@@ -196,14 +196,18 @@ def main():
         )
 
     lines.append('')
-    lines.append('-- Gallery (%d photos)' % len(gallery))
+    lines.append('-- Gallery: %d projects, each starting with a single photo.' % len(gallery))
+    lines.append('-- More photos can be added to any project from /admin, and the')
+    lines.append('-- website then steps through them in a carousel.')
     for g in gallery:
         lines.append(
-            'INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES '
-            '(%s, %s, %s, %d);' % (
-                sql(g['caption']), sql(g['image_key']),
-                sql(g['image_alt']), g['sort_order'],
-            )
+            'INSERT INTO gallery (caption, sort_order) VALUES (%s, %d);'
+            % (sql(g['caption']), g['sort_order'])
+        )
+        lines.append(
+            'INSERT INTO gallery_images (gallery_id, image_key, image_alt, sort_order) VALUES '
+            '(last_insert_rowid(), %s, %s, 1);'
+            % (sql(g['image_key']), sql(g['image_alt']))
         )
 
     lines.append('')

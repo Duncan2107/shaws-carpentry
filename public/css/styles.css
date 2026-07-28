@@ -685,10 +685,62 @@ h1, h2, h3, h4 {
   font-size: 0.9375rem;
 }
 
+/* Tile badge showing a project holds more than one photo */
+.gallery-item__count {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+  background: rgba(24, 21, 17, 0.78);
+  color: var(--white);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+}
+
+/* Carousel arrows */
+.lightbox__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  background: rgba(24, 21, 17, 0.6);
+  border: 1px solid rgba(245, 241, 232, 0.35);
+  border-radius: 50%;
+  color: var(--text-on-dark);
+  cursor: pointer;
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition);
+}
+
+.lightbox__nav:hover {
+  background: rgba(245, 241, 232, 0.2);
+}
+
+.lightbox__nav[hidden] {
+  display: none;
+}
+
+.lightbox__nav--prev {
+  left: var(--space-3);
+}
+
+.lightbox__nav--next {
+  right: var(--space-3);
+}
+
 .lightbox__close {
   position: absolute;
   top: var(--space-3);
   right: var(--space-3);
+  z-index: 2;
   background: none;
   border: 1px solid rgba(245, 241, 232, 0.4);
   border-radius: var(--radius);
