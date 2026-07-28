@@ -44,7 +44,9 @@ INSERT INTO gallery (caption, image_key, image_alt, sort_order) VALUES ('Metal P
 
 -- Contact settings
 INSERT INTO settings (key, value) VALUES ('areas_commercial', 'Commercial work across Sussex, Kent and London');
+INSERT INTO settings (key, value) VALUES ('areas_commercial_short', 'Commercial: Sussex, Kent & London');
 INSERT INTO settings (key, value) VALUES ('areas_domestic', 'Domestic work across Sussex and Kent');
+INSERT INTO settings (key, value) VALUES ('areas_domestic_short', 'Domestic: Sussex & Kent');
 INSERT INTO settings (key, value) VALUES ('email', 'stuart@shawscarpentry.com');
 INSERT INTO settings (key, value) VALUES ('form_endpoint', 'https://formspree.io/f/xpqvkpjl');
 INSERT INTO settings (key, value) VALUES ('hours_weekday', 'Monday to Friday, 8am to 6pm');

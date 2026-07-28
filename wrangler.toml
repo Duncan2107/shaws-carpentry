@@ -11,6 +11,19 @@ compatibility_date = "2026-07-28"
 [assets]
 directory = "./public"
 binding = "ASSETS"
+# The Worker must run before the asset server for the HTML pages, so it can
+# inject content from D1. Everything else (CSS, JS, images) is served straight
+# from the asset server, which is faster and not billed as a request.
+run_worker_first = [
+  "/",
+  "/index.html",
+  "/services",
+  "/services.html",
+  "/gallery",
+  "/gallery.html",
+  "/contact",
+  "/contact.html",
+]
 
 [observability]
 enabled = true
@@ -20,7 +33,6 @@ binding = "DB"
 database_name = "shaws-carpentry"
 database_id = "2b8fb15a-d286-45ac-8c0f-8416e7e88155"
 
-# Uncomment once R2 is enabled in the Cloudflare dashboard (Phase 5):
-# [[r2_buckets]]
-# binding = "PHOTOS"
-# bucket_name = "shaws-carpentry-photos"
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "shaws-carpentry-photos"

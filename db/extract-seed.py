@@ -133,12 +133,18 @@ def extract_settings():
 
     form_endpoint = grab(r'data-endpoint="([^"]+)"', 'form endpoint').group(1)
 
+    # The footer uses a shorter form of the same areas.
+    footer = grab(r'<ul data-content="footer-contact">(.*?)</ul>', 'footer contact list').group(1)
+    footer_areas = re.findall(r'<li>((?:Domestic|Commercial):[^<]*)</li>', footer)
+
     return {
         'phone_href': phone_href,
         'phone_display': clean(phone_text),
         'email': email,
         'areas_domestic': areas[0] if areas else '',
         'areas_commercial': areas[1] if len(areas) > 1 else '',
+        'areas_domestic_short': clean(footer_areas[0]) if footer_areas else '',
+        'areas_commercial_short': clean(footer_areas[1]) if len(footer_areas) > 1 else '',
         'hours_weekday': hours[0] if hours else '',
         'hours_weekend': hours[1] if len(hours) > 1 else '',
         'form_endpoint': form_endpoint,
