@@ -15,12 +15,12 @@ binding = "ASSETS"
 [observability]
 enabled = true
 
-# Added in Phase 2:
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "shaws-carpentry"
-# database_id = "..."
-#
+[[d1_databases]]
+binding = "DB"
+database_name = "shaws-carpentry"
+database_id = "2b8fb15a-d286-45ac-8c0f-8416e7e88155"
+
+# Uncomment once R2 is enabled in the Cloudflare dashboard (Phase 5):
 # [[r2_buckets]]
 # binding = "PHOTOS"
 # bucket_name = "shaws-carpentry-photos"
