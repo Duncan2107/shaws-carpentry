@@ -21,6 +21,8 @@ import {
   serviceOptions,
   footerContact,
 } from './content.js';
+import { requireAdmin, json } from './auth.js';
+import { handleApi } from './api.js';
 
 /** Paths whose HTML gets content injected. */
 const PAGES = new Set([
@@ -115,11 +117,55 @@ async function renderPage(request, env) {
   return buildRewriter(content).transform(response);
 }
 
+/** Serves an uploaded photo out of R2. */
+async function servePhoto(request, env, key) {
+  if (!env.PHOTOS) return new Response('Photo storage not configured.', { status: 503 });
+  if (!key) return new Response('Not found.', { status: 404 });
+
+  const object = await env.PHOTOS.get(key);
+  if (!object) return new Response('Not found.', { status: 404 });
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set('etag', object.httpEtag);
+  // Uploads get a content-hashed name, so they can be cached hard.
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  return new Response(object.body, { headers });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     // Treat /services/ the same as /services.
     const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, '') : url.pathname;
+
+    if (path.startsWith('/img/')) {
+      return servePhoto(request, env, decodeURIComponent(path.slice('/img/'.length)));
+    }
+
+    if (path === '/api' || path.startsWith('/api/')) {
+      const auth = await requireAdmin(request, env);
+      if (!auth.ok) return auth.response;
+      return handleApi(request, env, path);
+    }
+
+    if (path === '/admin' || path.startsWith('/admin/')) {
+      const auth = await requireAdmin(request, env);
+      if (!auth.ok) {
+        // Access normally intercepts before this point; reaching here means
+        // the request arrived somewhere Access does not cover.
+        return new Response(
+          'Sign in through Cloudflare Access to reach the admin area.',
+          { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+        );
+      }
+      // Let the asset server resolve /admin to admin/index.html itself, the
+      // same way it does for the public pages.
+      const response = await env.ASSETS.fetch(request);
+      const copy = new Response(response.body, response);
+      copy.headers.set('Cache-Control', 'no-store');
+      return copy;
+    }
 
     if (PAGES.has(path)) return renderPage(request, env);
 

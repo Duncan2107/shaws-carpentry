@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Manage your website | Shaws Carpentry</title>
+  <link rel="icon" href="/Media/logo.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body class="admin">
+  <header class="admin-header">
+    <div class="admin-header__inner">
+      <div class="admin-brand">
+        <img src="/Media/logo.png" alt="" width="260" height="228">
+        <div>
+          <p class="admin-brand__title">Manage your website</p>
+          <p class="admin-brand__sub" id="signed-in-as">Loading&hellip;</p>
+        </div>
+      </div>
+      <div class="admin-header__actions">
+        <a class="btn btn--ghost" href="/" target="_blank" rel="noopener">View site</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="admin-status" id="status" role="status" aria-live="polite"></div>
+
+  <nav class="admin-tabs" aria-label="Sections">
+    <button class="admin-tab" data-tab="services" aria-current="page">Services</button>
+    <button class="admin-tab" data-tab="gallery">Photos</button>
+    <button class="admin-tab" data-tab="testimonials">Reviews</button>
+    <button class="admin-tab" data-tab="settings">Contact details</button>
+  </nav>
+
+  <main class="admin-main">
+    <!-- Services -->
+    <section class="admin-panel is-active" id="panel-services">
+      <div class="admin-panel__head">
+        <div>
+          <h2>Services</h2>
+          <p>These appear on the Services page and in the enquiry form's dropdown. Tick "Show on home page" for the four you want featured.</p>
+        </div>
+        <button class="btn btn--primary" data-add="services">Add a service</button>
+      </div>
+      <h3 class="admin-group">Domestic</h3>
+      <div class="admin-list" id="list-services-domestic"></div>
+      <h3 class="admin-group">Commercial</h3>
+      <div class="admin-list" id="list-services-commercial"></div>
+    </section>
+
+    <!-- Gallery -->
+    <section class="admin-panel" id="panel-gallery">
+      <div class="admin-panel__head">
+        <div>
+          <h2>Photos</h2>
+          <p>The Our Work page. Visitors can click any photo to see it full size.</p>
+        </div>
+        <button class="btn btn--primary" data-add="gallery">Add a photo</button>
+      </div>
+      <div class="admin-list" id="list-gallery"></div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="admin-panel" id="panel-testimonials">
+      <div class="admin-panel__head">
+        <div>
+          <h2>Reviews</h2>
+          <p>While nothing is published here, the home page shows a "Reviews coming soon" message instead. Publish one and it appears straight away.</p>
+        </div>
+        <button class="btn btn--primary" data-add="testimonials">Add a review</button>
+      </div>
+      <div class="admin-list" id="list-testimonials"></div>
+    </section>
+
+    <!-- Settings -->
+    <section class="admin-panel" id="panel-settings">
+      <div class="admin-panel__head">
+        <div>
+          <h2>Contact details</h2>
+          <p>Used on the Contact page and in the footer of every page.</p>
+        </div>
+      </div>
+      <form class="admin-form admin-card" id="settings-form">
+        <div class="admin-field">
+          <label for="set-phone_display">Phone number (as shown)</label>
+          <input id="set-phone_display" name="phone_display" type="text" required>
+        </div>
+        <div class="admin-field">
+          <label for="set-phone_href">Phone number (for the dial link)</label>
+          <input id="set-phone_href" name="phone_href" type="text" required>
+          <p class="admin-hint">No spaces, including country code, e.g. +447477392931</p>
+        </div>
+        <div class="admin-field">
+          <label for="set-email">Email address</label>
+          <input id="set-email" name="email" type="email" required>
+        </div>
+        <div class="admin-field">
+          <label for="set-areas_domestic">Domestic areas (Contact page)</label>
+          <input id="set-areas_domestic" name="areas_domestic" type="text">
+        </div>
+        <div class="admin-field">
+          <label for="set-areas_commercial">Commercial areas (Contact page)</label>
+          <input id="set-areas_commercial" name="areas_commercial" type="text">
+        </div>
+        <div class="admin-field">
+          <label for="set-areas_domestic_short">Domestic areas (footer, short)</label>
+          <input id="set-areas_domestic_short" name="areas_domestic_short" type="text">
+        </div>
+        <div class="admin-field">
+          <label for="set-areas_commercial_short">Commercial areas (footer, short)</label>
+          <input id="set-areas_commercial_short" name="areas_commercial_short" type="text">
+        </div>
+        <div class="admin-field">
+          <label for="set-hours_weekday">Opening hours (weekdays)</label>
+          <input id="set-hours_weekday" name="hours_weekday" type="text">
+        </div>
+        <div class="admin-field">
+          <label for="set-hours_weekend">Opening hours (weekend)</label>
+          <input id="set-hours_weekend" name="hours_weekend" type="text">
+        </div>
+        <div class="admin-form__actions">
+          <button class="btn btn--primary" type="submit">Save contact details</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <!-- Edit dialog -->
+  <dialog class="admin-dialog" id="editor">
+    <form method="dialog" class="admin-dialog__form" id="editor-form">
+      <h2 id="editor-title">Edit</h2>
+      <div id="editor-fields"></div>
+      <p class="admin-error" id="editor-error" hidden></p>
+      <div class="admin-dialog__actions">
+        <button class="btn btn--ghost" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn btn--primary" id="editor-save" value="save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

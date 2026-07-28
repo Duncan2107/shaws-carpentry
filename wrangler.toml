@@ -23,6 +23,11 @@ run_worker_first = [
   "/gallery.html",
   "/contact",
   "/contact.html",
+  # The admin area and its API must never be served straight from the asset
+  # server, or the sign-in check would be skipped.
+  "/admin",
+  "/admin/*",
+  "/api/*",
 ]
 
 [observability]
