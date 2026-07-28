@@ -1,0 +1,26 @@
+# Cloudflare Workers config for the Shaws Carpentry site.
+#
+# Phase 1 serves the static site only. Later phases add the D1 database,
+# R2 photo storage and the admin API, which is why this is a Worker with
+# static assets rather than a plain Pages project.
+
+name = "shaws-carpentry"
+main = "src/index.js"
+compatibility_date = "2026-07-28"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[observability]
+enabled = true
+
+# Added in Phase 2:
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "shaws-carpentry"
+# database_id = "..."
+#
+# [[r2_buckets]]
+# binding = "PHOTOS"
+# bucket_name = "shaws-carpentry-photos"
