@@ -1,0 +1,15 @@
+# Full-size original photos (~121 MB). Kept locally only — never deployed,
+# and deliberately not committed so the repo stays small.
+# BACK THESE UP SEPARATELY: they are the only high-resolution copies.
+/originals/
+
+# Local tooling and editor/OS noise
+/.claude/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node (used from Phase 2 onward for Wrangler)
+node_modules/
+.wrangler/
+.dev.vars
