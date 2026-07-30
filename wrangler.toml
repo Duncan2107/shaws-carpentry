@@ -8,6 +8,21 @@ name = "shaws-carpentry"
 main = "src/index.js"
 compatibility_date = "2026-07-28"
 
+# Declaring routes switches the *.workers.dev preview off by default. Keep it
+# on for now so there is somewhere to test that is not the live site; worth
+# turning off once the custom domain has settled, so the site does not exist
+# at two public addresses.
+workers_dev = true
+
+# The live site. Rollback is in docs/dns-migration.md.
+[[routes]]
+pattern = "shawscarpentry.com"
+custom_domain = true
+
+[[routes]]
+pattern = "www.shawscarpentry.com"
+custom_domain = true
+
 [assets]
 directory = "./public"
 binding = "ASSETS"

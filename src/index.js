@@ -220,6 +220,14 @@ async function servePhoto(request, env, key) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // Send www to the bare domain so a page has one address, not two. This is
+    // what Netlify did before the move, so existing links keep working.
+    if (url.hostname.startsWith('www.')) {
+      url.hostname = url.hostname.slice(4);
+      return Response.redirect(url.toString(), 301);
+    }
+
     // Treat /services/ the same as /services.
     const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, '') : url.pathname;
 
