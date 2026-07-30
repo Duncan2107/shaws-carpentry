@@ -84,7 +84,7 @@ def extract_services():
     return rows
 
 
-# Which services appear on the home page grid.
+# Which services start out on the home page grid.
 #
 # The hand-written home page used combined marketing titles ("Fitted Kitchens
 # & Bathrooms") that do not map to a single service row, so the four below are
@@ -187,8 +187,8 @@ def main():
     for s in services:
         lines.append(
             'INSERT INTO services '
-            '(category, title, description, image_key, image_alt, featured, sort_order) VALUES '
-            '(%s, %s, %s, %s, %s, %d, %d);' % (
+            '(category, title, description, image_key, image_alt, show_on_home, show_on_services, sort_order) VALUES '
+            '(%s, %s, %s, %s, %s, %d, 1, %d);' % (
                 sql(s['category']), sql(s['title']), sql(s['description']),
                 sql(s['image_key']), sql(s['image_alt']),
                 1 if is_featured(s['title']) else 0, s['sort_order'],

@@ -437,6 +437,37 @@ body.admin {
   gap: var(--space-3);
 }
 
+/* Upload control. A styled label standing in for the file input, which
+   cannot be styled directly. */
+.admin-upload-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--bronze-deep);
+  border-color: var(--bronze-deep);
+  color: var(--white);
+  font-weight: 500;
+  justify-self: start;
+}
+
+.admin-upload-btn:hover {
+  background: var(--charcoal);
+  border-color: var(--charcoal);
+  color: var(--white);
+}
+
+.admin-upload-btn:has(input:disabled) {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 /* Multi-photo editor for gallery projects */
 .admin-photos {
   display: grid;

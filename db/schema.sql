@@ -20,17 +20,18 @@ CREATE TABLE services (
   description TEXT    NOT NULL,
   image_key   TEXT,
   image_alt   TEXT    NOT NULL DEFAULT '',
-  -- Shown on the home page grid. Kept separate from sort_order so the home
-  -- page selection can differ from the services page ordering.
-  featured    INTEGER NOT NULL DEFAULT 0 CHECK (featured IN (0, 1)),
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  published   INTEGER NOT NULL DEFAULT 1 CHECK (published IN (0, 1)),
+  -- Independent switches. A service can appear on the home page, the
+  -- services page, both, or neither. show_on_services also governs whether
+  -- it is offered in the enquiry form's dropdown.
+  show_on_home     INTEGER NOT NULL DEFAULT 0 CHECK (show_on_home IN (0, 1)),
+  show_on_services INTEGER NOT NULL DEFAULT 1 CHECK (show_on_services IN (0, 1)),
+  sort_order       INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_services_listing ON services (published, category, sort_order);
-CREATE INDEX idx_services_featured ON services (published, featured, sort_order);
+CREATE INDEX idx_services_on_services ON services (show_on_services, category, sort_order);
+CREATE INDEX idx_services_on_home ON services (show_on_home, sort_order);
 
 -- A project on /gallery. One tile in the grid, but it can hold several
 -- photos: the first is the cover, and opening it steps through the rest.

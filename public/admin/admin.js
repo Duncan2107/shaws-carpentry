@@ -76,8 +76,9 @@
       { name: 'image_key', label: 'Photo', type: 'photo' },
       { name: 'image_alt', label: 'Photo description', type: 'text',
         hint: 'Describes the photo for people using a screen reader.' },
-      { name: 'featured', label: 'Show on the home page', type: 'check' },
-      { name: 'published', label: 'Visible on the website', type: 'check' },
+      { name: 'show_on_services', label: 'Show on the Services page', type: 'check',
+        hint: 'Also decides whether it appears in the enquiry form’s dropdown.' },
+      { name: 'show_on_home', label: 'Show on the home page', type: 'check' },
     ],
     gallery: [
       { name: 'caption', label: 'Caption', type: 'text', required: true },
@@ -107,6 +108,13 @@
     return item.image_key || '';
   }
 
+  // Services have two switches rather than one, so "visible" means it appears
+  // on at least one page.
+  function isVisible(collection, item) {
+    if (collection === 'services') return !!(item.show_on_home || item.show_on_services);
+    return !!item.published;
+  }
+
   function itemRow(collection, item, index, total) {
     var t = TITLES[collection];
     var title = item[t.key] || '(untitled)';
@@ -117,14 +125,23 @@
       : item.quote;
 
     var badges = '';
-    if (collection === 'services' && item.featured) {
-      badges += '<span class="admin-item__badge admin-item__badge--featured">Home page</span>';
-    }
-    if (collection === 'gallery' && photoCount > 1) {
-      badges += '<span class="admin-item__badge admin-item__badge--featured">Carousel</span>';
-    }
-    if (!item.published) {
-      badges += '<span class="admin-item__badge admin-item__badge--hidden">Hidden</span>';
+    if (collection === 'services') {
+      if (item.show_on_home) {
+        badges += '<span class="admin-item__badge admin-item__badge--featured">Home page</span>';
+      }
+      if (!item.show_on_services) {
+        badges += '<span class="admin-item__badge admin-item__badge--hidden">Not on Services</span>';
+      }
+      if (!item.show_on_home && !item.show_on_services) {
+        badges += '<span class="admin-item__badge admin-item__badge--hidden">Hidden</span>';
+      }
+    } else {
+      if (collection === 'gallery' && photoCount > 1) {
+        badges += '<span class="admin-item__badge admin-item__badge--featured">Carousel</span>';
+      }
+      if (!item.published) {
+        badges += '<span class="admin-item__badge admin-item__badge--hidden">Hidden</span>';
+      }
     }
 
     var cover = coverOf(item);
@@ -132,8 +149,9 @@
       ? '<img class="admin-item__thumb" src="' + esc(cover) + '" alt="">'
       : '<span class="admin-item__thumb admin-item__thumb--empty"></span>';
 
+    var visible = isVisible(collection, item);
     return '' +
-      '<div class="admin-item' + (item.published ? '' : ' is-unpublished') + '" data-id="' + item.id + '">' +
+      '<div class="admin-item' + (visible ? '' : ' is-unpublished') + '" data-id="' + item.id + '">' +
         '<div class="admin-item__move">' +
           '<button type="button" data-move="up" aria-label="Move up"' + (index === 0 ? ' disabled' : '') + '>&uarr;</button>' +
           '<button type="button" data-move="down" aria-label="Move down"' + (index === total - 1 ? ' disabled' : '') + '>&darr;</button>' +
@@ -146,7 +164,7 @@
         '<div class="admin-item__actions">' +
           '<button type="button" class="admin-btn-small" data-action="edit">Edit</button>' +
           '<button type="button" class="admin-btn-small" data-action="toggle">' +
-            (item.published ? 'Hide' : 'Show') + '</button>' +
+            (visible ? 'Hide' : 'Show') + '</button>' +
           '<button type="button" class="admin-btn-small admin-btn-small--danger" data-action="delete">Delete</button>' +
         '</div>' +
       '</div>';
@@ -182,6 +200,62 @@
   }
 
   /* -------------------------------------------------------------- editor */
+
+  /* ---- uploading ---- */
+
+  var MAX_EDGE = 1600;
+
+  /**
+   * Shrinks a photo in the browser before it is sent.
+   *
+   * Phone cameras produce 5-10MB files, which are far larger than anything
+   * the site displays. Resizing here means the upload is quick on a phone
+   * signal and the stored file is already the right size, rather than
+   * shipping the full thing and dealing with it afterwards.
+   */
+  function shrinkImage(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.naturalWidth;
+        var h = img.naturalHeight;
+        if (w > MAX_EDGE || h > MAX_EDGE) {
+          var scale = MAX_EDGE / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob); else reject(new Error('Could not process that image.'));
+        }, 'image/jpeg', 0.78);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('That file does not look like an image.'));
+      };
+      img.src = url;
+    });
+  }
+
+  async function uploadPhoto(file) {
+    var blob = await shrinkImage(file);
+    var form = new FormData();
+    form.append('file', blob, 'photo.jpg');
+    // No Content-Type header: the browser sets the multipart boundary.
+    var response = await fetch('/api/upload', { method: 'POST', body: form });
+    var payload = await response.json().catch(function () { return null; });
+    if (!response.ok) {
+      throw new Error(payload && payload.error ? payload.error : 'Upload failed.');
+    }
+    if (state.photos.indexOf(payload.url) === -1) state.photos.unshift(payload.url);
+    return payload.url;
+  }
 
   /* ---- multi-photo editor (gallery projects) ---- */
 
@@ -246,6 +320,52 @@
       draftImages.push({ image_key: state.photos[0] || '', image_alt: '' });
       renderDraftImages();
     }
+  }, false);
+
+  // Uploads, from either the single-photo picker or the gallery editor.
+  editorFields.addEventListener('change', async function (e) {
+    if (e.target.type !== 'file') return;
+    var files = Array.prototype.slice.call(e.target.files || []);
+    if (!files.length) return;
+
+    var label = e.target.closest('.admin-upload-btn');
+    var original = label ? label.firstChild.nodeValue : null;
+    if (label) label.firstChild.nodeValue = files.length > 1
+      ? 'Uploading ' + files.length + ' photos...'
+      : 'Uploading...';
+    editorError.hidden = true;
+    e.target.disabled = true;
+
+    try {
+      var urls = [];
+      for (var i = 0; i < files.length; i++) urls.push(await uploadPhoto(files[i]));
+
+      var forField = e.target.getAttribute('data-upload-for');
+      if (forField) {
+        // Single-photo picker: rebuild the options and select the new one.
+        var select = editorForm.elements[forField];
+        select.innerHTML = ['<option value="">No photo</option>'].concat(
+          state.photos.map(function (p) {
+            return '<option value="' + esc(p) + '">' +
+              esc(p.replace(/^\/Media\//, '').replace(/^\/img\//, 'uploaded: ')) + '</option>';
+          })
+        ).join('');
+        select.value = urls[0];
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        urls.forEach(function (url) {
+          draftImages.push({ image_key: url, image_alt: '' });
+        });
+        renderDraftImages();
+      }
+    } catch (err) {
+      editorError.textContent = err.message;
+      editorError.hidden = false;
+    } finally {
+      e.target.disabled = false;
+      e.target.value = '';
+      if (label && original !== null) label.firstChild.nodeValue = original;
+    }
   });
 
   editorFields.addEventListener('input', function (e) {
@@ -267,7 +387,12 @@
     if (field.type === 'images') {
       return '<div class="admin-field"><label>' + esc(field.label) + '</label>' + hint +
         '<div id="images-list" class="admin-photos"></div>' +
-        '<button type="button" class="admin-btn-small" id="images-add">Add another photo</button></div>';
+        '<div class="admin-upload-row">' +
+          '<button type="button" class="admin-btn-small" id="images-add">Choose an existing photo</button>' +
+          '<label class="admin-btn-small admin-upload-btn">Upload photos' +
+            '<input type="file" accept="image/*" multiple hidden id="images-upload">' +
+          '</label>' +
+        '</div></div>';
     }
 
     if (field.type === 'check') {
@@ -295,6 +420,9 @@
       ).join('');
       control = '<select id="' + id + '" name="' + field.name + '" data-photo-select' +
         (field.required ? ' required' : '') + '>' + options + '</select>' +
+        '<label class="admin-btn-small admin-upload-btn">Upload a new photo' +
+          '<input type="file" accept="image/*" hidden data-upload-for="' + field.name + '">' +
+        '</label>' +
         (value ? '<img class="admin-thumb-preview" id="preview-' + field.name + '" src="' + esc(value) + '" alt="">' : '');
     } else {
       control = '<input type="text" id="' + id + '" name="' + field.name + '" value="' + esc(value || '') + '"' +
@@ -314,7 +442,7 @@
     editorError.hidden = true;
 
     var defaults = item || (collection === 'services'
-      ? { category: 'domestic', published: 1 }
+      ? { category: 'domestic', show_on_services: 1, show_on_home: 0 }
       : collection === 'gallery' ? { published: 1 } : { published: 0 });
 
     draftImages = (item && item.images ? item.images : []).map(function (img) {
@@ -460,12 +588,19 @@
     }
 
     if (action === 'toggle') {
+      var visible = isVisible(collection, item);
+      // Hiding a service takes it off both pages; showing it again puts it
+      // back on the services page, which is where a service normally lives.
+      var change = collection === 'services'
+        ? (visible ? { show_on_home: false, show_on_services: false }
+                   : { show_on_services: true })
+        : { published: !item.published };
       try {
         await api('/' + collection + '/' + id, {
           method: 'PUT',
-          body: JSON.stringify({ published: !item.published }),
+          body: JSON.stringify(change),
         });
-        say(item.published ? 'Hidden from the website.' : 'Now visible on the website.');
+        say(visible ? 'Hidden from the website.' : 'Now visible on the website.');
         await load();
       } catch (err) {
         say(err.message, 'error');

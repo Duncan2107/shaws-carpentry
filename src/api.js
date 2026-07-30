@@ -22,9 +22,11 @@ const COLLECTIONS = {
       description: { type: 'text', required: true, max: 1000 },
       image_key: { type: 'text', max: 300, nullable: true },
       image_alt: { type: 'text', max: 300, default: '' },
-      featured: { type: 'bool', default: 0 },
+      // Independent switches: a service can be on either page, both, or
+      // neither. See db/migrations/001-split-home-and-services.sql.
+      show_on_home: { type: 'bool', default: 0 },
+      show_on_services: { type: 'bool', default: 1 },
       sort_order: { type: 'int', default: 0 },
-      published: { type: 'bool', default: 1 },
     },
   },
   gallery: {
@@ -63,6 +65,81 @@ const SETTING_KEYS = new Set([
 ]);
 
 class ValidationError extends Error {}
+
+/**
+ * Accepted image types, identified by the bytes themselves rather than the
+ * Content-Type header. A client can claim anything; the file's own signature
+ * is harder to lie about, and these files get served back to the public.
+ */
+const IMAGE_SIGNATURES = [
+  { ext: 'jpg', type: 'image/jpeg', bytes: [0xff, 0xd8, 0xff] },
+  { ext: 'png', type: 'image/png', bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
+  { ext: 'webp', type: 'image/webp', bytes: [0x52, 0x49, 0x46, 0x46], offset: 0, also: { at: 8, bytes: [0x57, 0x45, 0x42, 0x50] } },
+];
+
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+
+function identifyImage(bytes) {
+  for (const sig of IMAGE_SIGNATURES) {
+    const matches = sig.bytes.every((b, i) => bytes[i] === b);
+    if (!matches) continue;
+    if (sig.also && !sig.also.bytes.every((b, i) => bytes[sig.also.at + i] === b)) continue;
+    return sig;
+  }
+  return null;
+}
+
+async function sha256Hex(buffer) {
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Stores an uploaded photo in R2 and returns the path to serve it from.
+ *
+ * The admin shrinks images in the browser before sending, so what arrives is
+ * already web-sized. The checks here are not about trusting that: they are
+ * because anything reachable from the public /img/ route needs to actually be
+ * an image, whatever the client claimed.
+ */
+async function handleUpload(request, env) {
+  if (!env.PHOTOS) return json({ error: 'Photo storage is not set up yet.' }, 503);
+
+  let form;
+  try {
+    form = await request.formData();
+  } catch {
+    // Malformed or missing body. Answer plainly rather than letting the
+    // parser's own error surface.
+    return json({ error: 'No photo was received. Please choose a file and try again.' }, 400);
+  }
+
+  const file = form.get('file');
+  if (!file || typeof file === 'string') {
+    return json({ error: 'No file was included.' }, 400);
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return json({ error: 'That photo is too large. Please use one under 8MB.' }, 400);
+  }
+
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer.slice(0, 16));
+  const signature = identifyImage(bytes);
+  if (!signature) {
+    return json({ error: 'That file is not a JPEG, PNG or WebP image.' }, 400);
+  }
+
+  // Name by content hash: uploading the same photo twice reuses one object,
+  // and the name can never contain anything awkward from the original.
+  const hash = await sha256Hex(buffer);
+  const key = `${hash.slice(0, 32)}.${signature.ext}`;
+
+  await env.PHOTOS.put(key, buffer, {
+    httpMetadata: { contentType: signature.type, cacheControl: 'public, max-age=31536000, immutable' },
+  });
+
+  return json({ key, url: `/img/${key}`, type: signature.type, bytes: buffer.byteLength }, 201);
+}
 
 function coerce(name, spec, raw, { partial }) {
   if (raw === undefined) {
@@ -215,6 +292,12 @@ export async function handleApi(request, env, path) {
 
     if (resource === 'photos' && method === 'GET') {
       return json({ photos: await listPhotos(env) });
+    }
+
+    if (resource === 'upload' && method === 'POST') {
+      // Awaited, not returned directly: returning the promise would let a
+      // rejection escape the catch below and surface as a raw stack trace.
+      return await handleUpload(request, env);
     }
 
     if (resource === 'settings') {

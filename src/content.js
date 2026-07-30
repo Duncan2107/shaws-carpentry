@@ -22,8 +22,10 @@ export function esc(value) {
 export async function loadContent(env) {
   const [services, gallery, galleryImages, testimonials, settings] = await env.DB.batch([
     env.DB.prepare(
-      `SELECT category, title, description, image_key, image_alt, featured, sort_order
-         FROM services WHERE published = 1
+      `SELECT category, title, description, image_key, image_alt,
+              show_on_home, show_on_services, sort_order
+         FROM services
+        WHERE show_on_home = 1 OR show_on_services = 1
         ORDER BY category, sort_order, id`
     ),
     env.DB.prepare(
@@ -113,7 +115,7 @@ const ENQUIRE_COMMERCIAL = enquireCard(
 
 export function servicesGrid(content, category) {
   const cards = content.services
-    .filter((s) => s.category === category)
+    .filter((s) => s.show_on_services && s.category === category)
     .map((s) => serviceCard(s, false))
     .join('');
   const enquire = category === 'domestic' ? ENQUIRE_DOMESTIC : ENQUIRE_COMMERCIAL;
@@ -122,7 +124,7 @@ export function servicesGrid(content, category) {
 
 export function featuredServices(content) {
   const cards = content.services
-    .filter((s) => s.featured)
+    .filter((s) => s.show_on_home)
     .map((s) => serviceCard(s, true))
     .join('');
   return cards + '\n        ';
@@ -230,9 +232,11 @@ export function contactInfo(content) {
 }
 
 export function serviceOptions(content) {
+  // Only what is on the services page. A service shown on the home page alone
+  // has no page describing it, so it is not offered as an enquiry option.
   const group = (label, category, otherLabel) => {
     const options = content.services
-      .filter((s) => s.category === category)
+      .filter((s) => s.show_on_services && s.category === category)
       .map((s) => `\n                  <option>${esc(s.title)}</option>`)
       .join('');
     return `

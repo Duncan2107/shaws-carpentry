@@ -201,10 +201,18 @@ function signInPage(status) {
   });
 }
 
-/** Serves an uploaded photo out of R2. */
+/**
+ * Serves an uploaded photo out of R2.
+ *
+ * Uploads are named by content hash, so only that shape is accepted here.
+ * Anything else is refused without touching storage, which keeps this route
+ * from being used to probe for other objects in the bucket.
+ */
+const PHOTO_KEY = /^[a-f0-9]{32}\.(jpg|png|webp)$/;
+
 async function servePhoto(request, env, key) {
   if (!env.PHOTOS) return new Response('Photo storage not configured.', { status: 503 });
-  if (!key) return new Response('Not found.', { status: 404 });
+  if (!key || !PHOTO_KEY.test(key)) return new Response('Not found.', { status: 404 });
 
   const object = await env.PHOTOS.get(key);
   if (!object) return new Response('Not found.', { status: 404 });
@@ -212,8 +220,11 @@ async function servePhoto(request, env, key) {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set('etag', object.httpEtag);
-  // Uploads get a content-hashed name, so they can be cached hard.
+  // The name is a content hash, so the bytes behind it never change.
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  // Serve it as exactly the type it was identified as on upload, and stop
+  // browsers guessing something else from the content.
+  headers.set('X-Content-Type-Options', 'nosniff');
   return new Response(object.body, { headers });
 }
 
