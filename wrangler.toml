@@ -45,6 +45,16 @@ run_worker_first = [
   "/api/*",
 ]
 
+# Cloudflare Access application that guards /admin and /api.
+#
+# Neither value is a secret: the team domain publishes its signing keys
+# publicly, and the audience tag only names the application. The security
+# comes from verifying the token's signature against those keys (see
+# src/auth.js), not from keeping these hidden.
+[vars]
+ACCESS_TEAM_DOMAIN = "wandering-frost-3a78.cloudflareaccess.com"
+ACCESS_AUD = "f2760f2e788065c498fcc913e49c171e8127fec9d699cb0b1d2deb93cdc8a953"
+
 [observability]
 enabled = true
 
