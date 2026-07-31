@@ -1,55 +1,120 @@
 # Shaws Carpentry
 
-Marketing site for Shaws Carpentry — domestic and commercial carpentry across Sussex, Kent and London.
+Website for a domestic and commercial carpentry business covering Sussex, Kent
+and London. Live at **https://shawscarpentry.com**, served from a Cloudflare
+Worker, with an admin area the owner uses to manage his own content.
 
-## Layout
+Building a similar site for another client? See
+[docs/new-client-site.md](docs/new-client-site.md).
+
+## How it fits together
 
 ```
-public/           Everything that gets deployed
-  index.html      Home
-  services.html   Domestic and commercial services
-  gallery.html    Our Work (photo grid + lightbox)
-  contact.html    Contact details and enquiry form
-  css/styles.css  All styling (design tokens at the top)
-  js/main.js      Nav, scroll reveal, lightbox, contact form
-  Media/          Web-sized images (~1600px JPEG)
-originals/        Full-size source photos — NOT in git, NOT deployed
+shawscarpentry.com
+├── /                 four public pages, static HTML with content injected from D1
+├── /img/<key>        photos uploaded through the admin, served from R2
+├── /admin            content manager  ─┐ both behind Cloudflare Access
+└── /api/*            admin API        ─┘
 ```
 
-## Running locally
+The four public pages are ordinary HTML in `public/`. The Worker runs ahead of
+them and swaps the contents of containers marked `data-content` for whatever is
+currently in the database, so pages still leave the edge as complete HTML (good
+for search engines) and an edit is live immediately with no rebuild.
+
+| Piece | Where |
+|---|---|
+| Public pages | `public/*.html` |
+| Styling, design tokens | `public/css/styles.css` |
+| Front-end behaviour | `public/js/main.js` |
+| Admin area | `public/admin/` |
+| Router, page rendering | `src/index.js` |
+| Database reads → HTML | `src/content.js` |
+| Admin API | `src/api.js` |
+| Cloudflare Access checks | `src/auth.js` |
+| Visitor statistics | `src/analytics.js` |
+| Schema, seed, migrations | `db/` |
+
+## Running it locally
 
 ```bash
-python -m http.server 8137 --directory public
+npm install
 ```
 
-Then open http://localhost:8137.
+```bash
+npx wrangler dev --port 8137 --local
+```
+
+Then open http://localhost:8137. `wrangler dev` is the right way to run this —
+a plain static file server will not exercise the Worker, the database or the
+URL handling.
+
+Local development needs a `.dev.vars` file (git-ignored, never deployed):
+
+```
+ADMIN_DEV_BYPASS=true
+ANALYTICS_SALT=any-string-for-local-use
+```
+
+`ADMIN_DEV_BYPASS` opens `/admin` without a login, so the admin can be worked
+on locally. It only ever exists in `.dev.vars`; on the deployed Worker the
+Cloudflare Access check is the only way in.
+
+Seed a local database:
+
+```bash
+npx wrangler d1 execute shaws-carpentry --local --file=db/schema.sql
+```
+
+```bash
+npx wrangler d1 execute shaws-carpentry --local --file=db/seed.sql
+```
+
+## Deploying
+
+```bash
+npm run deploy
+```
+
+This publishes straight to the live site. There is no staging address: the
+`workers.dev` URL is deliberately switched off so the site does not exist at a
+second public address. Test locally first.
 
 ## Images
 
-`public/Media/` holds web-sized images only: max 1600px wide, JPEG quality 74,
-roughly 100–360 KB each. The originals are 5–9.5 MB PNGs and live in
-`originals/`, which is git-ignored.
+`public/Media/` holds web-sized images only: max 1600px wide, JPEG quality ~74.
+Photos uploaded through the admin are shrunk in the browser before upload and
+stored in R2, served from `/img/`.
 
-**Back `originals/` up somewhere else.** It is the only high-resolution copy and
-it is not in this repository by design — committing 121 MB of PNGs would make
-every clone painful.
-
-To regenerate a web image after adding a new original, resize to 1600px wide and
-save as JPEG at quality ~74.
-
-## Contact form
-
-Posts to Formspree (`https://formspree.io/f/xpqvkpjl`) via `fetch` in
-`js/main.js`; the endpoint is set on the form's `data-endpoint` attribute in
-`contact.html`. Enquiries arrive at stuart@shawscarpentry.com. Free tier allows
-50 submissions/month.
+The full-size originals live in `originals/`, which is **git-ignored and is the
+only copy — back it up separately.** Committing 121MB of PNGs would make every
+clone painful, which is why they are not in here.
 
 ## Content notes
 
-- Services are split Domestic (14) and Commercial (2: Fire Doors, Metal
-  Partitioning). The contact form's dropdown mirrors this split.
-- The reviews section on the home page currently shows a single "Reviews coming
-  soon" card. When real reviews arrive, swap it for `.quote` figures inside a
-  plain `.quote-grid` — that styling already exists in `css/styles.css`.
-- House style: no em or en dashes in copy, and no dash-like decorative
+- Services have two independent switches: `show_on_home` and
+  `show_on_services`. The enquiry form's dropdown follows `show_on_services`
+  only, so a service featured on the home page but with no page describing it
+  is not offered as an enquiry option.
+- A gallery entry is a *project* that can hold several photos. The first is the
+  cover; opening it steps through the rest in a carousel.
+- With no published reviews the home page shows a "Reviews coming soon" card
+  and switches to the three-column grid as soon as one is published.
+- House style: no em or en dashes in the copy, and no dash-like decorative
   flourishes.
+
+## Enquiry form
+
+Posts to Formspree (`https://formspree.io/f/xpqvkpjl`), set on the form's
+`data-endpoint` in `contact.html` and overridden from the `form_endpoint`
+setting in the database. Enquiries arrive at stuart@shawscarpentry.com. The
+free tier covers 50 submissions a month.
+
+## Visitor statistics
+
+Recorded by the site itself into D1 and shown on the admin's Visitors tab.
+No cookies and nothing identifying is stored, so the site needs no cookie
+banner — see `db/migrations/002-page-views.sql` for exactly what is kept.
+
+Obvious crawlers are filtered out, which includes `curl`: testing this from a
+command line records nothing. Use a browser.
