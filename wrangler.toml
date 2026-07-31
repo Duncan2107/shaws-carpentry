@@ -8,11 +8,15 @@ name = "shaws-carpentry"
 main = "src/index.js"
 compatibility_date = "2026-07-28"
 
-# Declaring routes switches the *.workers.dev preview off by default. Keep it
-# on for now so there is somewhere to test that is not the live site; worth
-# turning off once the custom domain has settled, so the site does not exist
-# at two public addresses.
-workers_dev = true
+# The site answers on shawscarpentry.com only. The *.workers.dev address is
+# switched off so the site does not exist at a second public address that
+# Google could index as duplicate content, and so /admin is not reachable on a
+# hostname the Cloudflare Access policy does not cover.
+#
+# Turn it back on temporarily if you ever need somewhere to test that is not
+# the live site.
+workers_dev = false
+preview_urls = false
 
 # The live site. Rollback is in docs/dns-migration.md.
 [[routes]]
