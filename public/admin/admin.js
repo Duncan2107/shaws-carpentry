@@ -459,9 +459,8 @@
     draftImages = (item && item.images ? item.images : []).map(function (img) {
       return { image_key: img.image_key, image_alt: img.image_alt || '' };
     });
-    if (collection === 'gallery' && draftImages.length === 0) {
-      draftImages = [{ image_key: '', image_alt: '' }];
-    }
+    // No blank row on open. An empty project shows "No photos yet" and a row
+    // appears only when one is chosen or uploaded.
 
     editorFields.innerHTML = FIELDS[collection]
       .map(function (f) { return fieldHtml(f, defaults[f.name]); })
