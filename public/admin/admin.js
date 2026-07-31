@@ -638,6 +638,176 @@
     }
   });
 
+  /* ------------------------------------------------------------ visitors */
+
+  var statsRange = 30;
+  var statsData = null;
+
+  function compact(n) {
+    return n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K' : String(n);
+  }
+
+  function deltaLabel(now, before) {
+    if (!before) return null;
+    var pct = Math.round(((now - before) / before) * 100);
+    if (pct === 0) return { text: 'no change', dir: 'flat' };
+    return {
+      text: (pct > 0 ? '+' : '') + pct + '%',
+      dir: pct > 0 ? 'up' : 'down',
+    };
+  }
+
+  function statTile(label, value, delta, note) {
+    var d = '';
+    if (delta) {
+      d = '<span class="admin-kpi__delta is-' + delta.dir + '">' + esc(delta.text) +
+          ' <span class="admin-kpi__vs">vs previous ' + statsRange + ' days</span></span>';
+    }
+    return '<div class="admin-kpi">' +
+      '<p class="admin-kpi__label">' + esc(label) + '</p>' +
+      '<p class="admin-kpi__value">' + esc(compact(value)) + '</p>' +
+      d + (note ? '<p class="admin-hint">' + esc(note) + '</p>' : '') +
+      '</div>';
+  }
+
+  var shortDate = function (iso) {
+    var d = new Date(iso + 'T00:00:00Z');
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  };
+
+  /**
+   * Columns of visitors per day.
+   *
+   * One series, so no legend: the heading above already says what is plotted.
+   * Only the busiest day is labelled directly; the axis and the tooltip carry
+   * the rest, and the full numbers are in the table below.
+   */
+  function renderChart(daily) {
+    var host = document.getElementById('chart');
+    var max = daily.reduce(function (m, d) { return Math.max(m, d.visitors); }, 0);
+
+    if (max === 0) {
+      host.innerHTML = '<p class="admin-empty">No visits recorded yet. Figures appear here as people browse the site.</p>';
+      return;
+    }
+
+    var W = 720, H = 220, padL = 34, padR = 8, padT = 18, padB = 26;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var band = plotW / daily.length;
+    var barW = Math.min(24, Math.max(3, band - 2));   // 2px surface gap, capped
+    var peak = daily.reduce(function (a, b) { return b.visitors > a.visitors ? b : a; }, daily[0]);
+
+    // Round the axis top to something tidy.
+    var step = max <= 5 ? 1 : max <= 20 ? 5 : max <= 60 ? 10 : Math.ceil(max / 4 / 25) * 25;
+    var top = Math.ceil(max / step) * step;
+    var ticks = [];
+    for (var t = 0; t <= top; t += step) ticks.push(t);
+
+    var y = function (v) { return padT + plotH - (v / top) * plotH; };
+
+    var grid = ticks.map(function (t) {
+      return '<line class="chart-grid" x1="' + padL + '" x2="' + (W - padR) +
+        '" y1="' + y(t).toFixed(1) + '" y2="' + y(t).toFixed(1) + '"></line>' +
+        '<text class="chart-tick" x="' + (padL - 6) + '" y="' + (y(t) + 3.5).toFixed(1) + '">' + t + '</text>';
+    }).join('');
+
+    var bars = daily.map(function (d, i) {
+      var x = padL + i * band + (band - barW) / 2;
+      var h = d.visitors === 0 ? 0 : Math.max(2, (d.visitors / top) * plotH);
+      var label = shortDate(d.day) + ': ' + d.visitors + (d.visitors === 1 ? ' visitor' : ' visitors') +
+                  ', ' + d.views + (d.views === 1 ? ' page view' : ' page views');
+      if (h === 0) {
+        return '<rect class="chart-hit" x="' + (padL + i * band) + '" y="' + padT +
+          '" width="' + band + '" height="' + plotH + '"><title>' + esc(label) + '</title></rect>';
+      }
+      // Rounded at the data end, square at the baseline.
+      var r = Math.min(4, barW / 2, h);
+      var yTop = padT + plotH - h;
+      var path = 'M' + x + ',' + (padT + plotH) +
+                 'V' + (yTop + r) +
+                 'a' + r + ',' + r + ' 0 0 1 ' + r + ',-' + r +
+                 'h' + (barW - 2 * r) +
+                 'a' + r + ',' + r + ' 0 0 1 ' + r + ',' + r +
+                 'V' + (padT + plotH) + 'Z';
+      return '<path class="chart-bar" d="' + path + '"><title>' + esc(label) + '</title></path>' +
+        '<rect class="chart-hit" x="' + (padL + i * band) + '" y="' + padT +
+        '" width="' + band + '" height="' + plotH + '"><title>' + esc(label) + '</title></rect>';
+    }).join('');
+
+    // Label the busiest day only, and only if it will not collide with the edge.
+    var peakIndex = daily.indexOf(peak);
+    var peakX = padL + peakIndex * band + band / 2;
+    var peakLabel = peak.visitors > 0
+      ? '<text class="chart-peak" x="' + peakX.toFixed(1) + '" y="' + (y(peak.visitors) - 6).toFixed(1) +
+        '" text-anchor="' + (peakIndex < 2 ? 'start' : peakIndex > daily.length - 3 ? 'end' : 'middle') + '">' +
+        peak.visitors + '</text>'
+      : '';
+
+    var first = daily[0], last = daily[daily.length - 1];
+    var axis =
+      '<text class="chart-tick" x="' + padL + '" y="' + (H - 8) + '" text-anchor="start">' + esc(shortDate(first.day)) + '</text>' +
+      '<text class="chart-tick" x="' + (W - padR) + '" y="' + (H - 8) + '" text-anchor="end">' + esc(shortDate(last.day)) + '</text>';
+
+    host.innerHTML =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" preserveAspectRatio="xMidYMid meet" ' +
+      'aria-label="Visitors per day for the last ' + daily.length + ' days. Busiest day ' +
+      esc(shortDate(peak.day)) + ' with ' + peak.visitors + '.">' +
+      grid + bars + peakLabel + axis +
+      '</svg>';
+  }
+
+  function renderStats() {
+    var d = statsData;
+    document.getElementById('stat-tiles').innerHTML =
+      statTile('Visitors', d.total.visitors, deltaLabel(d.total.visitors, d.previous.visitors)) +
+      statTile('Page views', d.total.views, deltaLabel(d.total.views, d.previous.views)) +
+      statTile('Pages per visit', d.total.visitors
+        ? Math.round((d.total.views / d.total.visitors) * 10) / 10 : 0, null,
+        'How much they look at while they are here.');
+
+    document.getElementById('chart-title').textContent =
+      'Visitors per day, last ' + d.days + ' days';
+    renderChart(d.daily);
+
+    var sources = document.querySelector('#sources-table tbody');
+    if (!d.sources.length) {
+      sources.innerHTML = '<tr><td colspan="3" class="admin-table__empty">Nothing recorded yet.</td></tr>';
+    } else {
+      sources.innerHTML = d.sources.map(function (s) {
+        var name = s.source === 'direct' ? 'Typed in or bookmarked' : s.source;
+        return '<tr><td>' + esc(name) + '</td><td>' + s.visitors + '</td><td>' + s.views + '</td></tr>';
+      }).join('');
+    }
+
+    document.querySelector('#daily-table tbody').innerHTML = d.daily
+      .slice()
+      .reverse()
+      .map(function (r) {
+        return '<tr><td>' + esc(shortDate(r.day)) + '</td><td>' + r.visitors + '</td><td>' + r.views + '</td></tr>';
+      }).join('');
+  }
+
+  async function loadStats() {
+    try {
+      statsData = await api('/stats?days=' + statsRange);
+      renderStats();
+    } catch (err) {
+      document.getElementById('chart').innerHTML =
+        '<p class="admin-empty">' + esc(err.message) + '</p>';
+    }
+  }
+
+  document.querySelectorAll('[data-range]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('[data-range]').forEach(function (b) {
+        b.removeAttribute('aria-pressed');
+      });
+      btn.setAttribute('aria-pressed', 'true');
+      statsRange = Number(btn.getAttribute('data-range'));
+      loadStats();
+    });
+  });
+
   /* ---------------------------------------------------------------- tabs */
 
   document.querySelectorAll('.admin-tab').forEach(function (tab) {
@@ -646,9 +816,13 @@
         t.removeAttribute('aria-current');
       });
       tab.setAttribute('aria-current', 'page');
+      var name = tab.getAttribute('data-tab');
       document.querySelectorAll('.admin-panel').forEach(function (panel) {
-        panel.classList.toggle('is-active', panel.id === 'panel-' + tab.getAttribute('data-tab'));
+        panel.classList.toggle('is-active', panel.id === 'panel-' + name);
       });
+      // Visitor figures are fetched when the tab is opened, and refreshed on
+      // each visit so they are never stale.
+      if (name === 'visitors') loadStats();
     });
   });
 

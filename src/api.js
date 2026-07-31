@@ -6,6 +6,7 @@
  */
 
 import { json } from './auth.js';
+import { readStats } from './analytics.js';
 
 /**
  * Which columns each collection accepts, and how to validate them.
@@ -292,6 +293,12 @@ export async function handleApi(request, env, path) {
 
     if (resource === 'photos' && method === 'GET') {
       return json({ photos: await listPhotos(env) });
+    }
+
+    if (resource === 'stats' && method === 'GET') {
+      const url = new URL(request.url);
+      const days = Number(url.searchParams.get('days')) || 30;
+      return json(await readStats(env, days));
     }
 
     if (resource === 'upload' && method === 'POST') {

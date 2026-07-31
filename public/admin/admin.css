@@ -407,6 +407,186 @@ body.admin {
   flex-wrap: wrap;
 }
 
+/* ---- Visitors ---- */
+.admin-range {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.admin-range .admin-btn-small[aria-pressed="true"] {
+  background: var(--charcoal);
+  border-color: var(--charcoal);
+  color: var(--white);
+}
+
+.admin-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: var(--space-3);
+}
+
+.admin-kpi {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.admin-kpi__label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.admin-kpi__value {
+  font-family: var(--font-sans);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--charcoal);
+}
+
+.admin-kpi__delta {
+  display: inline-block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+/* Direction is stated in words as well as colour, so the meaning does not
+   depend on being able to tell green from red. */
+.admin-kpi__delta.is-up { color: #3d5226; }
+.admin-kpi__delta.is-down { color: #7c2d1e; }
+.admin-kpi__delta.is-flat { color: var(--text-muted); }
+
+.admin-kpi__vs {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.admin-chart {
+  padding: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+.admin-chart figcaption {
+  margin-bottom: var(--space-2);
+}
+
+.admin-chart figcaption h3 {
+  font-size: 1.0625rem;
+  margin-bottom: 0.125rem;
+}
+
+.admin-chart figcaption p {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.admin-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+/* Only the data is allowed to be loud: grid and ticks stay recessive. */
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart-tick {
+  fill: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-anchor: end;
+}
+
+.chart-bar {
+  fill: var(--bronze-deep);
+  transition: fill var(--transition);
+}
+
+.chart-peak {
+  fill: var(--charcoal);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Full-height hit area so short columns are still easy to hover. */
+.chart-hit {
+  fill: transparent;
+}
+
+.chart-hit:hover + .chart-bar,
+.chart-bar:hover {
+  fill: var(--charcoal);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.625rem var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.admin-table td:nth-child(2),
+.admin-table td:nth-child(3),
+.admin-table th:nth-child(2),
+.admin-table th:nth-child(3) {
+  text-align: right;
+  width: 7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table__empty {
+  color: var(--text-muted);
+  text-align: center !important;
+}
+
+.admin-details {
+  margin-top: var(--space-3);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.admin-details summary {
+  padding: 0.875rem var(--space-3);
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--charcoal);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.admin-details[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
 /* ---- Dialog ---- */
 .admin-dialog {
   border: none;

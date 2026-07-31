@@ -23,6 +23,7 @@ import {
 } from './content.js';
 import { requireAdmin, json } from './auth.js';
 import { handleApi } from './api.js';
+import { recordView } from './analytics.js';
 
 // Fallback asset version for local development, where there is no deployment
 // id. It changes whenever the dev server restarts, which is exactly when the
@@ -229,7 +230,7 @@ async function servePhoto(request, env, key) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // Send www to the bare domain so a page has one address, not two. This is
@@ -268,7 +269,14 @@ export default {
       return copy;
     }
 
-    if (PAGES.has(path)) return renderPage(request, env);
+    if (PAGES.has(path)) {
+      // Count the visit after the response is on its way, so nobody waits on
+      // the database and a failure here cannot break the page.
+      if (request.method === 'GET') {
+        ctx.waitUntil(recordView(request, env, url));
+      }
+      return renderPage(request, env);
+    }
 
     return env.ASSETS.fetch(request);
   },

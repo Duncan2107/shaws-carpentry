@@ -35,6 +35,7 @@
     <button class="admin-tab" data-tab="gallery">Photos</button>
     <button class="admin-tab" data-tab="testimonials">Reviews</button>
     <button class="admin-tab" data-tab="settings">Contact details</button>
+    <button class="admin-tab" data-tab="visitors">Visitors</button>
   </nav>
 
   <main class="admin-main">
@@ -128,7 +129,52 @@
         </div>
       </form>
     </section>
+    <!-- Visitors -->
+    <section class="admin-panel" id="panel-visitors">
+      <div class="admin-panel__head">
+        <div>
+          <h2>Visitors</h2>
+          <p>How many people have been looking at the website, and how they found it. No cookies are used and nothing about individual visitors is stored.</p>
+        </div>
+        <div class="admin-range" role="group" aria-label="Time period">
+          <button class="admin-btn-small" data-range="7">7 days</button>
+          <button class="admin-btn-small" data-range="30" aria-pressed="true">30 days</button>
+          <button class="admin-btn-small" data-range="90">90 days</button>
+        </div>
+      </div>
+
+      <div class="admin-kpis" id="stat-tiles"></div>
+
+      <figure class="admin-card admin-chart">
+        <figcaption>
+          <h3 id="chart-title">Visitors per day</h3>
+          <p id="chart-note">Someone viewing several pages in a day counts once.</p>
+        </figcaption>
+        <div id="chart"></div>
+      </figure>
+
+      <h3 class="admin-group">Where visitors came from</h3>
+      <div class="admin-card">
+        <table class="admin-table" id="sources-table">
+          <thead>
+            <tr><th scope="col">Source</th><th scope="col">Visitors</th><th scope="col">Page views</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <details class="admin-details">
+        <summary>See the daily figures as a table</summary>
+        <table class="admin-table" id="daily-table">
+          <thead>
+            <tr><th scope="col">Date</th><th scope="col">Visitors</th><th scope="col">Page views</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </details>
+    </section>
   </main>
+
 
   <!-- Edit dialog -->
   <dialog class="admin-dialog" id="editor">
