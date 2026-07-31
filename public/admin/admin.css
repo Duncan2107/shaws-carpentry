@@ -557,8 +557,19 @@ body.admin {
   font-variant-numeric: tabular-nums;
 }
 
-.admin-table tr:last-child td {
+.admin-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.admin-table tfoot td {
+  border-top: 2px solid var(--line);
+  border-bottom: none;
+  font-weight: 600;
+  color: var(--charcoal);
+}
+
+.admin-hint--table {
+  margin-top: 0.5rem;
 }
 
 .admin-table__empty {

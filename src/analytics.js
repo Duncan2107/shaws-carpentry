@@ -103,10 +103,31 @@ export async function readStats(env, days = 30) {
          FROM page_views WHERE day >= ${since}
         GROUP BY day ORDER BY day`
     ),
+    // Each visitor is credited to one source: where they first arrived that
+    // day. Attributing per page view instead meant someone who came from
+    // Google and later returned directly was counted under both, and anyone
+    // whose first recorded view was internal navigation appeared under
+    // neither, so the rows never summed to the visitor total.
+    //
+    // A visitor with no external referrer at all counts as direct, which is
+    // the usual convention.
     env.DB.prepare(
-      `SELECT source, COUNT(*) AS views, COUNT(DISTINCT visitor) AS visitors
-         FROM page_views WHERE day >= ${since} AND source != 'internal'
-        GROUP BY source ORDER BY visitors DESC, views DESC LIMIT 12`
+      `SELECT entry.source AS source, COUNT(*) AS visitors
+         FROM (
+           SELECT p.day, p.visitor,
+                  COALESCE((
+                    SELECT p2.source FROM page_views p2
+                     WHERE p2.day = p.day
+                       AND p2.visitor = p.visitor
+                       AND p2.source != 'internal'
+                     ORDER BY p2.id LIMIT 1
+                  ), 'direct') AS source
+             FROM page_views p
+            WHERE p.day >= ${since}
+            GROUP BY p.day, p.visitor
+         ) AS entry
+        GROUP BY entry.source
+        ORDER BY visitors DESC, source`
     ),
     env.DB.prepare(
       `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor) AS visitors
@@ -118,10 +139,24 @@ export async function readStats(env, days = 30) {
     ),
   ]);
 
+  // Keep the list short, but fold the tail into "Other" rather than dropping
+  // it, so the rows still add up to the visitor total.
+  const TOP = 10;
+  let rows = sources.results;
+  if (rows.length > TOP + 1) {
+    const head = rows.slice(0, TOP);
+    const tail = rows.slice(TOP);
+    head.push({
+      source: `${tail.length} other sources`,
+      visitors: tail.reduce((sum, r) => sum + r.visitors, 0),
+    });
+    rows = head;
+  }
+
   return {
     days,
     daily: fillDays(daily.results, days),
-    sources: sources.results,
+    sources: rows,
     total: current.results[0] || { views: 0, visitors: 0 },
     previous: previous.results[0] || { views: 0, visitors: 0 },
   };

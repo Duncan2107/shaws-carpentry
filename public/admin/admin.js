@@ -770,13 +770,19 @@
     renderChart(d.daily);
 
     var sources = document.querySelector('#sources-table tbody');
+    var foot = document.querySelector('#sources-table tfoot');
     if (!d.sources.length) {
-      sources.innerHTML = '<tr><td colspan="3" class="admin-table__empty">Nothing recorded yet.</td></tr>';
+      sources.innerHTML = '<tr><td colspan="2" class="admin-table__empty">Nothing recorded yet.</td></tr>';
+      foot.innerHTML = '';
     } else {
       sources.innerHTML = d.sources.map(function (s) {
         var name = s.source === 'direct' ? 'Typed in or bookmarked' : s.source;
-        return '<tr><td>' + esc(name) + '</td><td>' + s.visitors + '</td><td>' + s.views + '</td></tr>';
+        return '<tr><td>' + esc(name) + '</td><td>' + s.visitors + '</td></tr>';
       }).join('');
+      // The total is shown so the column can be checked against the tile
+      // above it at a glance.
+      var summed = d.sources.reduce(function (a, s) { return a + s.visitors; }, 0);
+      foot.innerHTML = '<tr><td>All visitors</td><td>' + summed + '</td></tr>';
     }
 
     document.querySelector('#daily-table tbody').innerHTML = d.daily
