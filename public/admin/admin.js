@@ -280,9 +280,15 @@
     }
 
     host.innerHTML = draftImages.map(function (img, i) {
+      // An empty src renders as a broken-image icon, which reads as a fault
+      // rather than an empty slot waiting to be filled.
+      var thumb = img.image_key
+        ? '<img class="admin-photo__thumb" src="' + esc(img.image_key) + '" alt="">'
+        : '<span class="admin-photo__thumb admin-photo__thumb--empty"></span>';
+
       return '' +
         '<div class="admin-photo" data-i="' + i + '">' +
-          '<img class="admin-photo__thumb" src="' + esc(img.image_key) + '" alt="">' +
+          thumb +
           '<div class="admin-photo__body">' +
             '<select class="admin-photo__select" data-field="image_key">' + photoOptions(img.image_key) + '</select>' +
             '<input class="admin-photo__alt" data-field="image_alt" type="text" ' +
@@ -317,7 +323,9 @@
 
     if (e.target.id === 'images-add') {
       e.preventDefault();
-      draftImages.push({ image_key: state.photos[0] || '', image_alt: '' });
+      // Nothing is chosen for the user. Defaulting to the first photo in the
+      // list meant a project could be saved with a photo nobody picked.
+      draftImages.push({ image_key: '', image_alt: '' });
       renderDraftImages();
     }
   }, false);
@@ -376,7 +384,10 @@
     if (!field || !draftImages[i]) return;
     draftImages[i][field] = e.target.value;
     if (field === 'image_key') {
-      row.querySelector('.admin-photo__thumb').src = e.target.value;
+      // Re-render rather than setting .src: the empty slot is a span, not an
+      // img, so the element itself has to change. Values live in draftImages,
+      // so nothing typed is lost.
+      renderDraftImages();
     }
   });
 
@@ -449,7 +460,7 @@
       return { image_key: img.image_key, image_alt: img.image_alt || '' };
     });
     if (collection === 'gallery' && draftImages.length === 0) {
-      draftImages = [{ image_key: state.photos[0] || '', image_alt: '' }];
+      draftImages = [{ image_key: '', image_alt: '' }];
     }
 
     editorFields.innerHTML = FIELDS[collection]

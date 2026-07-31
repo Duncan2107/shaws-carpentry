@@ -685,6 +685,13 @@ body.admin {
   background: var(--white);
 }
 
+/* An empty slot waiting for a photo, rather than a broken image icon. */
+.admin-photo__thumb--empty {
+  display: block;
+  border: 1px dashed var(--line);
+  background: var(--cream);
+}
+
 .admin-photo__body {
   display: grid;
   gap: 0.375rem;
