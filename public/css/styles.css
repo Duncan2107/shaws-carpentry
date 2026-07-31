@@ -685,6 +685,20 @@ h1, h2, h3, h4 {
   font-size: 0.9375rem;
 }
 
+/* Stands in for a grid whose contents are all switched off, so a section
+   never renders as a blank space with a heading above it. */
+.grid-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--white);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-6) var(--space-4);
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
 /* Tile badge showing a project holds more than one photo */
 .gallery-item__count {
   position: absolute;

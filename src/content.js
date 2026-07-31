@@ -118,6 +118,8 @@ export function servicesGrid(content, category) {
     .filter((s) => s.show_on_services && s.category === category)
     .map((s) => serviceCard(s, false))
     .join('');
+  // The enquire card is always there, so this section never renders empty
+  // even if every service in the category is switched off.
   const enquire = category === 'domestic' ? ENQUIRE_DOMESTIC : ENQUIRE_COMMERCIAL;
   return cards + enquire + '\n        ';
 }
@@ -127,12 +129,28 @@ export function featuredServices(content) {
     .filter((s) => s.show_on_home)
     .map((s) => serviceCard(s, true))
     .join('');
+  if (!cards) {
+    return `
+          <p class="grid-empty">Take a look at <a href="/services">everything we do</a>.</p>
+        `;
+  }
   return cards + '\n        ';
 }
 
 /* ----------------------------------------------------------------- gallery */
 
+/**
+ * Shown when every project is hidden, or none has a photo yet.
+ *
+ * Without this the page renders its heading and then an empty space, which
+ * reads as a broken page rather than a deliberate one.
+ */
+const GALLERY_EMPTY = `
+          <p class="grid-empty">New photographs of recent work are on their way. In the meantime, have a look at <a href="/services">what we do</a>, or <a href="/contact">get in touch</a> to talk about your project.</p>
+        `;
+
 export function galleryGrid(content) {
+  if (content.gallery.length === 0) return GALLERY_EMPTY;
   return (
     content.gallery
       .map((g) => {
