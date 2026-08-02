@@ -145,6 +145,35 @@ Posts to Formspree (`https://formspree.io/f/xpqvkpjl`), set on the form's
 setting in the database. Enquiries arrive at stuart@shawscarpentry.com. The
 free tier covers 50 submissions a month.
 
+## Quotes and invoices
+
+The **Quotes & invoices** tab prices up a job from tasks, each with a labour
+rate and its own materials carrying markup, and prints a customer copy on
+headed paper. Cost price and profit are shown on screen only, never on the
+printed copy.
+
+A job is one record that moves along: mark a quote Accepted when the customer
+says yes, then turn it into an invoice when the work is done. It keeps the
+reference it held as a quote, so an invoice still shows where it came from.
+Either can also be started from scratch.
+
+The reference is yours to set and has to be filled in. A new job arrives with
+the next number in the sequence (`Q-2026-001`, `INV-2026-001`) already in the
+box, which you can overwrite with whatever numbering you use. No two documents
+may share one.
+
+Business name, address, VAT number, bank details and payment terms come from
+the Contact details tab, so they are entered once. The VAT number and the bank
+details print on invoices only.
+
+The customer's copy can show a full breakdown, task totals only, or a single
+price with the work listed and no figures against it. A material is normally
+charged at cost plus markup, but you can type the price in yourself where you
+know what you are charging and not what it costs.
+
+Created by `db/migrations/004-documents.sql`, which has to be applied before
+the tab will load.
+
 ## Visitor statistics
 
 Recorded by the site itself into D1 and shown on the admin's Visitors tab.

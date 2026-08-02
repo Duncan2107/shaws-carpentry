@@ -340,6 +340,8 @@ body.admin {
 
 .admin-field input[type="text"],
 .admin-field input[type="email"],
+.admin-field input[type="date"],
+.admin-field input[type="number"],
 .admin-field select,
 .admin-field textarea {
   font-family: var(--font-sans);
@@ -598,6 +600,21 @@ body.admin {
   border-bottom: 1px solid var(--line);
 }
 
+/* Where a details block holds fields rather than a table, its contents need
+   room, and the form inside should not draw a second box within the first. */
+.admin-details__body {
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.admin-details__body .admin-form {
+  padding: 0;
+  max-width: none;
+  background: none;
+  border: none;
+}
+
 /* ---- Dialog ---- */
 .admin-dialog {
   border: none;
@@ -607,6 +624,11 @@ body.admin {
   width: calc(100% - 2rem);
   background: var(--white);
   color: var(--text);
+  /* The site's reset zeroes every margin, including the one the browser uses
+     to centre a modal dialog, which left every dialog in the top left corner.
+     With inset 0 from the browser, auto margins centre it both ways. */
+  margin: auto;
+  box-shadow: var(--shadow-md);
 }
 
 .admin-dialog::backdrop {
@@ -756,4 +778,586 @@ body.admin {
   .admin-item__body { grid-area: body; }
   .admin-item__actions { grid-area: actions; justify-content: flex-start; }
   .admin-panel__head { flex-direction: column; }
+}
+
+/* ==========================================================================
+   Quotes, orders and invoices
+   ========================================================================== */
+
+/* A display rule beats the browser's own [hidden] rule, and .admin-field sets
+   one. Without this, hiding "Payment due" on a quote does nothing. */
+[hidden] {
+  display: none !important;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-2);
+}
+
+/* These cards hold their own fields, so unlike the plain cards elsewhere they
+   need room around them. Without it the boxes sit hard against the edge. */
+#doc-builder-view > .admin-card {
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.admin-doc-new,
+.admin-doc-actions {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.admin-doc-actions--left {
+  justify-content: flex-start;
+  margin-block: var(--space-2);
+}
+
+.admin-doc-filters {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+/* A document row has a kind, a body and its actions: no photo, no reordering. */
+.admin-doc {
+  grid-template-columns: auto 1fr auto;
+}
+
+.admin-doc__type {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--cream);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.admin-doc__type--order {
+  border-color: var(--bronze);
+  color: var(--bronze-deep);
+}
+
+.admin-doc__type--invoice {
+  background: var(--charcoal);
+  border-color: var(--charcoal);
+  color: var(--text-on-dark);
+}
+
+/* ---- The builder ---- */
+
+.admin-task {
+  padding: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.admin-task__head {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: flex-end;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-task__head .admin-field {
+  margin: 0;
+  flex: 0 1 9rem;
+}
+
+.admin-task__name {
+  flex: 2 1 16rem;
+}
+
+.admin-task__delete {
+  margin-left: auto;
+}
+
+.admin-task__materials {
+  margin-top: var(--space-2);
+}
+
+.admin-task__materials input {
+  min-height: 40px;
+  padding: 0.4rem 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  color: var(--text);
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  width: 100%;
+}
+
+.admin-task__materials input:focus {
+  outline: none;
+  border-color: var(--bronze);
+}
+
+/* Switched off because a price has been typed in instead. It stays readable,
+   so the figure that is being ignored is still visible. */
+.admin-task__materials input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.admin-doc__num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* A pound sign inside the box. It cannot be part of the value, because these
+   are number inputs and a number input refuses anything that is not a number,
+   which is also what gets the numeric keypad on a phone. */
+.admin-money {
+  position: relative;
+  display: block;
+}
+
+.admin-money::before {
+  content: "£";
+  position: absolute;
+  left: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.admin-money input {
+  padding-left: 1.5rem;
+}
+
+/* The visitor tables pin their second and third columns to 7rem, and this
+   table shares the class. Here those are Qty and Unit cost, and unit cost with
+   a pound sign in front of it needs the room. */
+/* Wide enough for four digits and a decimal, plus the spinner arrows the
+   browser adds. At 5rem a quantity in the thousands was hidden behind them,
+   and quantities here are not always whole: hours go up in quarters. */
+.admin-task__materials td:nth-child(2),
+.admin-task__materials th:nth-child(2) {
+  width: 8.5rem;
+  text-align: left;
+}
+
+.admin-task__materials td:nth-child(3),
+.admin-task__materials th:nth-child(3) {
+  width: 9rem;
+  text-align: left;
+}
+
+.admin-task__materials th:nth-child(5),
+.admin-task__materials td:nth-child(5) {
+  width: 9rem;
+}
+
+/* The folded header for each material. Only used at phone width. */
+.admin-task__toggle {
+  display: none;
+}
+
+.admin-doc-save {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.admin-task__sub {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.admin-tot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0.25rem 0;
+  color: var(--text-muted);
+}
+
+.admin-tot span:last-child {
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.admin-tot__profit {
+  color: var(--bronze-deep);
+  font-weight: 600;
+}
+
+.admin-tot--big {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 2px solid var(--charcoal);
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+}
+
+.admin-tot--big span {
+  color: var(--charcoal);
+}
+
+@media (max-width: 48rem) {
+  .admin-doc {
+    grid-template-columns: 1fr;
+  }
+  .admin-doc__type {
+    justify-self: start;
+  }
+  .admin-item__actions {
+    justify-content: flex-start;
+  }
+  /* Open, Invoice, Duplicate and Delete on one line rather than wrapping onto
+     a second. They are short enough now to fit a phone. */
+  .admin-doc .admin-item__actions {
+    flex-wrap: nowrap;
+  }
+  .admin-doc .admin-item__actions .admin-btn-small {
+    flex: 1;
+    padding-inline: 0.375rem;
+    text-align: center;
+  }
+  .admin-task__delete {
+    margin-left: 0;
+  }
+
+  /* Eight columns will not fit on a phone, and scrolling a table sideways to
+     type in a box is miserable on site. Each material becomes a small stack
+     instead, with the column heading beside each figure. */
+  .admin-task__materials,
+  .admin-task__materials tbody,
+  .admin-task__materials tr,
+  .admin-task__materials td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-task__materials thead {
+    display: none;
+  }
+
+  /* A column, so the folded header can be ordered above the fields it hides
+     while staying last in the markup. */
+  .admin-task__materials tr {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+    background: var(--cream);
+  }
+
+  .admin-task__toggle {
+    display: block;
+    order: -1;
+    padding: 0;
+  }
+
+  .admin-task__toggle button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.5rem 0;
+    background: none;
+    border: none;
+    font: inherit;
+    color: var(--charcoal);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .admin-task__toggle button::after {
+    content: "▾";
+    color: var(--text-muted);
+    transition: transform var(--transition);
+  }
+
+  .admin-task__materials tr.is-open .admin-task__toggle button::after {
+    transform: rotate(180deg);
+  }
+
+  .admin-task__toggle-name {
+    font-weight: 500;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-task__toggle-sum {
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  /* Folded away: only the header shows until it is opened. */
+  .admin-task__materials tr:not(.is-open) td:not(.admin-task__toggle) {
+    display: none;
+  }
+
+  .admin-task__materials tr.is-open .admin-task__toggle {
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 0.5rem;
+  }
+
+  .admin-task__materials td {
+    display: grid;
+    grid-template-columns: 7rem 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+    text-align: left;
+  }
+
+  /* The visitor tables fix their second and third columns at 7rem and align
+     them right. That rule reaches this table too, because it shares the class,
+     and once a row is a stack it squeezes Qty and Unit cost down to nothing
+     and pushes their labels out of line with the rest. */
+  .admin-task__materials td:nth-child(2),
+  .admin-task__materials td:nth-child(3) {
+    width: 100%;
+    text-align: left;
+  }
+
+  .admin-task__materials td::before {
+    content: attr(data-label);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  /* The two worked-out figures read as a result, not another box to fill in. */
+  .admin-task__materials .admin-doc__num {
+    text-align: left;
+  }
+
+  .admin-task__materials td:last-child {
+    justify-items: start;
+    margin-top: 0.25rem;
+  }
+}
+
+/* ==========================================================================
+   The printed document
+   ========================================================================== */
+
+#doc-print {
+  display: none;
+}
+
+@media print {
+  /* A real page margin, applied to every sheet.
+     Padding on the container cannot do this job: it puts space at the top of
+     the first page and the bottom of the last one, and nothing in between, so
+     a second page began hard against the paper edge.
+     The cost is that the browser draws its own header and footer in this
+     margin unless "Headers and footers" is unticked in the print dialog. */
+  @page {
+    margin: 14mm;
+  }
+
+  /* Everything except the document itself is screen furniture. */
+  body.admin > *:not(#doc-print) {
+    display: none !important;
+  }
+
+  body.admin {
+    background: var(--white);
+    padding: 0;
+  }
+
+  #doc-print {
+    display: block;
+    color: #000;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    padding: 0;
+  }
+
+  #doc-print .running-foot {
+    margin-top: var(--space-3);
+    padding-top: 2mm;
+    border-top: 1px solid #ddd;
+    font-size: 0.75rem;
+    color: #555;
+    text-align: center;
+  }
+
+  #doc-print .head {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    border-bottom: 3px solid var(--bronze);
+    padding-bottom: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  #doc-print .head img {
+    height: 3.5rem;
+    width: auto;
+    margin-bottom: 0.5rem;
+  }
+
+  #doc-print .head p {
+    margin: 0;
+  }
+
+  #doc-print .biz {
+    font-family: var(--font-serif);
+    font-size: 1.35rem;
+    color: var(--charcoal);
+  }
+
+  #doc-print .meta {
+    text-align: right;
+  }
+
+  #doc-print .kind {
+    font-family: var(--font-serif);
+    font-size: 1.35rem;
+    letter-spacing: 0.08em;
+    color: var(--bronze-deep);
+  }
+
+  #doc-print .who {
+    margin-bottom: var(--space-2);
+  }
+
+  #doc-print .who p {
+    margin: 0;
+  }
+
+  #doc-print h3 {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    margin: var(--space-2) 0 0.25rem;
+    padding-bottom: 0.2rem;
+    border-bottom: 1px solid #ccc;
+  }
+
+  #doc-print table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.35rem;
+  }
+
+  #doc-print th {
+    text-align: left;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #999;
+    padding: 0.25rem;
+  }
+
+  #doc-print td {
+    padding: 0.25rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  #doc-print .n {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* Shown when the copy carries one price and no breakdown: the work is still
+     described, only the money against each line is left off. */
+  #doc-print .work {
+    margin: 0.35rem 0 0 1.1rem;
+  }
+
+  #doc-print .work li {
+    padding: 0.15rem 0;
+  }
+
+  #doc-print .totals {
+    margin: var(--space-3) 0 0 auto;
+    width: 18rem;
+  }
+
+  #doc-print .totals div {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.15rem 0;
+  }
+
+  #doc-print .totals .grand {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    border-top: 2px solid #000;
+    padding-top: 0.4rem;
+    margin-top: 0.25rem;
+  }
+
+  #doc-print .pay,
+  #doc-print .notes {
+    margin-top: var(--space-3);
+    padding-top: var(--space-2);
+    border-top: 1px solid #ccc;
+    font-size: 0.9rem;
+  }
+
+  #doc-print .pay p {
+    margin: 0 0 0.35rem;
+  }
+
+  /* What must not be cut in half by a page break. A task keeps its heading,
+     its materials and its total together; the money at the end stays whole. */
+  #doc-print .head,
+  #doc-print .who,
+  #doc-print .task,
+  #doc-print .totals,
+  #doc-print .pay,
+  #doc-print .notes,
+  #doc-print .running-foot,
+  #doc-print table,
+  #doc-print tr {
+    break-inside: avoid;
+  }
+
+  /* A heading never sits alone at the foot of a page. */
+  #doc-print h3 {
+    break-after: avoid;
+  }
+
+  /* If a long table does have to split, its column headings come with it. */
+  #doc-print thead {
+    display: table-header-group;
+  }
+
+  #doc-print tbody {
+    break-inside: auto;
+  }
+
+  /* Chrome drops backgrounds and borders when printing unless told not to,
+     which is what the bronze rule under the letterhead depends on. */
+  #doc-print,
+  #doc-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }

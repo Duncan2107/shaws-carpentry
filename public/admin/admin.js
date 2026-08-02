@@ -1,7 +1,7 @@
 /* Admin area behaviour.
  *
- * Talks to /api/*, which sits behind the same Cloudflare Access login as this
- * page, so there is no separate sign-in to handle here.
+ * Talks to /api/*, which sits behind the same sign-in as this page, so there
+ * is no separate login to handle here. A 403 means the session has run out.
  */
 
 (function () {
@@ -28,7 +28,105 @@
       .replace(/'/g, '&#39;');
     }
 
+  /**
+   * Every question and warning, in the middle of the screen.
+   *
+   * One dialog serves all of them: a confirmation, a question with a box to
+   * type in, or a warning with nothing to decide. Resolves to
+   * { action, value }, where action is the value of the button pressed, or
+   * 'cancel' if it was dismissed with Escape.
+   */
+  function ask(options) {
+    return new Promise(function (resolve) {
+      var dialog = document.getElementById('ask-dialog');
+      var message = document.getElementById('ask-message');
+      var field = document.getElementById('ask-input-field');
+      var input = document.getElementById('ask-input');
+      var actions = document.getElementById('ask-actions');
+
+      document.getElementById('ask-title').textContent = options.title || 'Are you sure?';
+      message.textContent = options.message || '';
+      message.hidden = !options.message;
+
+      field.hidden = !options.input;
+      if (options.input) {
+        document.getElementById('ask-input-label').textContent = options.input.label || '';
+        input.value = options.input.value || '';
+      }
+
+      var buttons = options.buttons || [{ value: 'ok', label: 'OK', primary: true }];
+      actions.innerHTML = buttons.map(function (b) {
+        return '<button class="btn ' + (b.primary ? 'btn--primary' : 'btn--ghost') +
+          '" value="' + esc(b.value) + '">' + esc(b.label) + '</button>';
+      }).join('');
+
+      var primary = buttons.filter(function (b) { return b.primary; })[0];
+
+      // Enter in the box should mean the main button, not whichever one
+      // happens to come first in the markup.
+      var onKey = function (e) {
+        if (e.key !== 'Enter' || !primary) return;
+        e.preventDefault();
+        var button = actions.querySelector('[value="' + primary.value + '"]');
+        if (button) button.click();
+      };
+      input.addEventListener('keydown', onKey);
+
+      dialog.returnValue = '';
+      var onClose = function () {
+        dialog.removeEventListener('close', onClose);
+        input.removeEventListener('keydown', onKey);
+        resolve({ action: dialog.returnValue || 'cancel', value: input.value.trim() });
+      };
+      dialog.addEventListener('close', onClose);
+
+      dialog.showModal();
+      if (options.input) {
+        input.focus();
+        input.select();
+      }
+    });
+  }
+
+  async function confirmAsk(title, message, confirmLabel, danger) {
+    var answer = await ask({
+      title: title,
+      message: message,
+      buttons: [
+        { value: 'cancel', label: 'Cancel' },
+        { value: 'ok', label: confirmLabel || (danger ? 'Delete' : 'Yes'), primary: true },
+      ],
+    });
+    return answer.action === 'ok';
+  }
+
+  async function promptAsk(title, label, value, confirmLabel) {
+    var answer = await ask({
+      title: title,
+      input: { label: label, value: value || '' },
+      buttons: [
+        { value: 'cancel', label: 'Cancel' },
+        { value: 'ok', label: confirmLabel || 'Save', primary: true },
+      ],
+    });
+    return answer.action === 'ok' ? answer.value : null;
+  }
+
+  function warn(message, title) {
+    return ask({
+      title: title || 'That did not work',
+      message: message,
+      buttons: [{ value: 'ok', label: 'Close', primary: true }],
+    });
+  }
+
   function say(message, kind) {
+    // Anything that went wrong is shown in the middle of the screen, where it
+    // cannot be missed. The banner is for things that went right.
+    if (kind === 'error') {
+      warn(message);
+      return;
+    }
     statusEl.textContent = message;
     statusEl.className = 'admin-status is-visible ' + (kind === 'error' ? 'is-error' : 'is-success');
     window.clearTimeout(statusTimer);
@@ -41,9 +139,17 @@
   }
 
   async function api(path, options) {
-    var response = await fetch('/api' + path, Object.assign({
-      headers: { 'Content-Type': 'application/json' },
-    }, options));
+    var response;
+    try {
+      response = await fetch('/api' + path, Object.assign({
+        headers: { 'Content-Type': 'application/json' },
+      }, options));
+    } catch (err) {
+      // fetch only rejects when the request never arrived. "Failed to fetch"
+      // on its own tells nobody anything, and locally it usually means the
+      // server has stopped while the page stayed open.
+      throw new Error('Could not reach the website. Check your connection, and if you are testing locally, that wrangler dev is still running.');
+    }
 
     if (response.status === 403) {
       // The session has run out. /admin serves the sign-in form when there is
@@ -623,7 +729,8 @@
 
     if (action === 'delete') {
       var label = item[TITLES[collection].key] || 'this item';
-      if (!window.confirm('Delete "' + label + '"? This cannot be undone.')) return;
+      if (!(await confirmAsk('Delete this?', 'Deleting "' + label + '" cannot be undone.',
+        'Delete', true))) return;
       try {
         await api('/' + collection + '/' + id, { method: 'DELETE' });
         say('Deleted.');
@@ -830,7 +937,11 @@
   /* ---------------------------------------------------------------- tabs */
 
   document.querySelectorAll('.admin-tab').forEach(function (tab) {
-    tab.addEventListener('click', function () {
+    tab.addEventListener('click', async function () {
+      // A job with unsaved changes gets a say before the tab switches, however
+      // you are leaving it.
+      if (window.AdminDocuments && !(await window.AdminDocuments.canLeave())) return;
+
       document.querySelectorAll('.admin-tab').forEach(function (t) {
         t.removeAttribute('aria-current');
       });
@@ -842,12 +953,32 @@
       // Visitor figures are fetched when the tab is opened, and refreshed on
       // each visit so they are never stale.
       if (name === 'visitors') loadStats();
+      // Quotes, orders and invoices are nothing to do with the website, so
+      // they are not part of the content load either. Same idea.
+      if (name === 'documents' && window.AdminDocuments) window.AdminDocuments.open();
     });
   });
+
+  /* ------------------------------------------------------- shared helpers */
+
+  // documents.js is a separate file only because this one is long enough. It
+  // needs the same request wrapper, status line and escaping rather than a
+  // second copy of each.
+  window.Admin = {
+    api: api,
+    say: say,
+    esc: esc,
+    ask: ask,
+    confirm: confirmAsk,
+    prompt: promptAsk,
+    warn: warn,
+    settings: function () { return state.settings; },
+  };
 
   /* ------------------------------------------------------------ sign out */
 
   document.getElementById('sign-out').addEventListener('click', async function () {
+    if (window.AdminDocuments && !(await window.AdminDocuments.canLeave())) return;
     try {
       await fetch('/api/logout', { method: 'POST' });
     } catch (err) {

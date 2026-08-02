@@ -56,8 +56,9 @@ resist rewriting them per client.
 
 ### The admin section — all of it
 
-`public/admin/` and `src/api.js`, `src/auth.js`. Five tabs: **Services,
-Photos, Reviews, Contact details, Visitors**. Keep every one.
+`public/admin/` and `src/api.js`, `src/auth.js`. Six tabs: **Services,
+Photos, Reviews, Quotes & invoices, Contact details, Visitors**. Keep every
+one.
 
 It is styled with the same design tokens as the public site, so it reads as
 part of the client's business rather than a generic control panel. Rebranding
@@ -153,6 +154,47 @@ site signal and means what lands in R2 is already the right size.
 The server identifies uploads by their **own bytes**, not the `Content-Type`
 the client claims, because these files are served back to the public. They are
 named by content hash, and `/img/` only accepts that shape.
+
+### Quotes and invoices
+
+`public/admin/documents.js`, the `documents` collection in `src/api.js`, and
+`db/migrations/004-documents.sql`. This replaced a standalone quoting app the
+client was running as a Windows executable, with its data in a JSON file on one
+machine.
+
+A job is **one row that moves along**: quoted, then an invoice when the work is
+done. It keeps the reference it held as a quote (`quote_ref`), so an invoice
+still shows where it came from. Accepted work waiting to be done is a quote
+marked Accepted, not a third kind of document: an orders stage existed briefly
+and was removed as needless. `order_ref` is still in the table, unused, because
+dropping a D1 column costs more than leaving it.
+
+Each type has its own statuses. "Overdue" is not stored, it is worked out from
+the due date, so it can never go stale.
+
+| Rule | Why |
+|---|---|
+| The **client sets the reference**, the admin only suggests the next one | They may already number jobs their own way. It is required and unique, and the database enforces the uniqueness. |
+| The task and material breakdown is a **JSON column** | It is only ever read and written whole by one screen. Two more tables would buy nothing. |
+| Cost price and profit **never** reach the printed copy | They are on screen for the client alone. This is the one thing that must not regress. |
+| The customer's copy has **three levels of detail** | Full breakdown, task totals only, or one price with the work listed but no figures against it. A bare total with nothing described is not a quotation, so the work is still named. |
+| A material can be **priced by hand** instead of cost plus markup | Sometimes you know what you are charging without knowing what it costs you. A price typed in wins, and the markup box switches off so it does not look as though it still applies. |
+| Every question and warning is **one centred dialog** | `window.confirm` and `window.prompt` are gone. Note that the site's reset zeroes the margin a browser uses to centre a modal `<dialog>`, so `.admin-dialog` sets `margin: auto` itself. |
+| The "already gone out" warning judges the **saved** status, not the one in the box | Otherwise marking a draft invoice as Sent warns you about editing a sent invoice, which is nonsense. |
+| Business details, VAT number and bank details come from the **Contact details tab** | Entered once, so a quote can never disagree with the website. The VAT number and bank details print on invoices only. |
+| The printed copy **waits for the logo to load** before printing | `window.print()` fired straight after setting the markup prints without it. |
+| `@page { margin: 14mm }`, not padding on the container | Padding puts space at the top of the first page and the bottom of the last, and nothing in between, so a second page starts hard against the paper edge. Only a page margin applies to every sheet. `margin: 0` was tried, because it also suppresses the browser's own URL and date, and it broke multi-page documents. Unticking "Headers and footers" in the print dialog is the answer to those instead. |
+| Each task is a `section.task` with `break-inside: avoid` | Otherwise a page break lands in the middle of a task and splits its figures from its heading. |
+
+Nothing here is rendered on a public page, and nothing should be: these rows
+hold customer names, addresses, phone numbers and bank details. `src/content.js`
+names the settings keys it uses, which is what keeps the bank details off the
+site.
+
+The arithmetic in `documents.js` is carried over unchanged from the app it
+replaced. It had been in use and giving the right answers. If it needs
+changing, change it in one place: the printed copy and the screen must never
+disagree.
 
 ### Also worth keeping
 

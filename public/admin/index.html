@@ -35,6 +35,7 @@
     <button class="admin-tab" data-tab="services" aria-current="page">Services</button>
     <button class="admin-tab" data-tab="gallery">Photos</button>
     <button class="admin-tab" data-tab="testimonials">Reviews</button>
+    <button class="admin-tab" data-tab="documents">Quotes &amp; invoices</button>
     <button class="admin-tab" data-tab="settings">Contact details</button>
     <button class="admin-tab" data-tab="visitors">Visitors</button>
   </nav>
@@ -79,6 +80,161 @@
       <div class="admin-list" id="list-testimonials"></div>
     </section>
 
+    <!-- Quotes, orders and invoices -->
+    <section class="admin-panel" id="panel-documents">
+
+      <div id="doc-list-view">
+        <div class="admin-panel__head">
+          <div>
+            <h2>Quotes &amp; invoices</h2>
+            <p>Price up a job, mark the quote Accepted when the customer says yes, then turn it into an invoice when the work is done. Nothing here appears on the website.</p>
+          </div>
+          <div class="admin-doc-new">
+            <button class="btn btn--primary" data-new="quote">New quote</button>
+            <button class="btn btn--primary" data-new="invoice">New invoice</button>
+          </div>
+        </div>
+
+        <div class="admin-doc-filters">
+          <div class="admin-range" role="group" aria-label="Kind of document">
+            <button class="admin-btn-small" data-doctype="all" aria-pressed="true">All</button>
+            <button class="admin-btn-small" data-doctype="quote">Quotes</button>
+            <button class="admin-btn-small" data-doctype="invoice">Invoices</button>
+          </div>
+          <div class="admin-range" role="group" aria-label="Status" id="doc-status-filter"></div>
+        </div>
+
+        <div class="admin-list" id="list-documents"></div>
+
+        <details class="admin-details">
+          <summary>Starting figures</summary>
+          <div class="admin-details__body">
+
+          <form class="admin-form" id="doc-defaults-form">
+            <div class="admin-grid">
+              <div class="admin-field">
+                <label for="set-quote_hourly_rate">Hourly rate (&pound;)</label>
+                <input id="set-quote_hourly_rate" name="quote_hourly_rate" type="number" step="0.5" min="0">
+              </div>
+              <div class="admin-field">
+                <label for="set-quote_day_rate">Day rate (&pound;)</label>
+                <input id="set-quote_day_rate" name="quote_day_rate" type="number" step="1" min="0">
+              </div>
+              <div class="admin-field">
+                <label for="set-quote_markup">Materials markup (%)</label>
+                <input id="set-quote_markup" name="quote_markup" type="number" step="0.5" min="0">
+              </div>
+              <div class="admin-field">
+                <label for="set-quote_vat">VAT (%)</label>
+                <input id="set-quote_vat" name="quote_vat" type="number" step="0.1" min="0" max="100">
+              </div>
+            </div>
+            <p class="admin-hint">Where a new job starts. You can change any of them on the job itself.</p>
+            <div class="admin-form__actions">
+              <button class="btn btn--primary" type="submit">Save starting figures</button>
+            </div>
+          </form>
+          </div>
+        </details>
+      </div>
+
+      <div id="doc-builder-view" hidden>
+        <div class="admin-panel__head">
+          <div>
+            <h2 id="doc-builder-title">New quote</h2>
+            <p id="doc-builder-sub"></p>
+          </div>
+          <div class="admin-doc-actions">
+            <button class="admin-btn-small" data-doc="back">Back to the list</button>
+            <button class="admin-btn-small" data-doc="print">Print or save as PDF</button>
+          </div>
+        </div>
+
+        <div class="admin-card">
+          <div class="admin-grid">
+            <div class="admin-field">
+              <label for="doc-ref">Reference</label>
+              <input id="doc-ref" type="text" required>
+            </div>
+            <div class="admin-field">
+              <label for="doc-issue_date">Date</label>
+              <input id="doc-issue_date" type="date">
+            </div>
+            <div class="admin-field">
+              <label for="doc-status">Status</label>
+              <select id="doc-status"></select>
+            </div>
+            <div class="admin-field" id="doc-due-field">
+              <label for="doc-due_date">Payment due</label>
+              <input id="doc-due_date" type="date">
+            </div>
+          </div>
+          <div class="admin-field">
+            <label for="doc-title">Job title</label>
+            <input id="doc-title" type="text" placeholder="e.g. Garden decking">
+          </div>
+          <div class="admin-grid">
+            <div class="admin-field">
+              <label for="doc-customer_name">Customer name</label>
+              <input id="doc-customer_name" type="text">
+            </div>
+            <div class="admin-field">
+              <label for="doc-customer_phone">Phone</label>
+              <input id="doc-customer_phone" type="text">
+            </div>
+            <div class="admin-field">
+              <label for="doc-customer_email">Email</label>
+              <input id="doc-customer_email" type="email">
+            </div>
+          </div>
+          <div class="admin-field">
+            <label for="doc-job_address">Job address</label>
+            <input id="doc-job_address" type="text">
+          </div>
+        </div>
+
+        <h3 class="admin-group">Tasks</h3>
+        <div id="doc-tasks"></div>
+        <div class="admin-doc-actions admin-doc-actions--left">
+          <button class="admin-btn-small" data-doc="add-task">Add a task</button>
+        </div>
+
+        <h3 class="admin-group">Notes for the customer</h3>
+        <div class="admin-card">
+          <div class="admin-field">
+            <label for="doc-notes">These print at the bottom of their copy</label>
+            <textarea id="doc-notes" rows="3" placeholder="Terms, exclusions, timescales"></textarea>
+          </div>
+        </div>
+
+        <h3 class="admin-group">Totals</h3>
+        <div class="admin-card">
+          <div class="admin-grid">
+            <div class="admin-field">
+              <label for="doc-vat_rate">VAT (%)</label>
+              <input id="doc-vat_rate" type="number" step="0.1" min="0" max="100">
+            </div>
+            <div class="admin-field">
+              <label for="doc-price_view">The customer's copy shows</label>
+              <select id="doc-price_view">
+                <option value="full">Full price breakdown</option>
+                <option value="summary">Task totals only</option>
+                <option value="totals">One price, no breakdown</option>
+              </select>
+            </div>
+          </div>
+          <div id="doc-totals"></div>
+          <p class="admin-hint">Cost price and profit are for you alone. They never appear on the copy you print for the customer.</p>
+        </div>
+
+        <!-- Saving comes after everything there is to fill in, not before it. -->
+        <div class="admin-doc-save">
+          <button class="admin-btn-small" data-doc="back">Back to the list</button>
+          <button class="btn btn--primary" data-doc="save">Save</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Settings -->
     <section class="admin-panel" id="panel-settings">
       <div class="admin-panel__head">
@@ -88,6 +244,15 @@
         </div>
       </div>
       <form class="admin-form admin-card" id="settings-form">
+        <div class="admin-field">
+          <label for="set-business_name">Business name</label>
+          <input id="set-business_name" name="business_name" type="text">
+          <p class="admin-hint">Heads your quotes, orders and invoices. Not shown on the website.</p>
+        </div>
+        <div class="admin-field">
+          <label for="set-business_address">Business address</label>
+          <input id="set-business_address" name="business_address" type="text">
+        </div>
         <div class="admin-field">
           <label for="set-phone_display">Phone number (as shown)</label>
           <input id="set-phone_display" name="phone_display" type="text" required>
@@ -125,6 +290,31 @@
           <label for="set-hours_weekend">Opening hours (weekend)</label>
           <input id="set-hours_weekend" name="hours_weekend" type="text">
         </div>
+        <h3 class="admin-group">How customers pay you</h3>
+        <p class="admin-hint">Printed on invoices, so they know where to send the money. Never shown on the website.</p>
+        <div class="admin-field">
+          <label for="set-vat_number">VAT number</label>
+          <input id="set-vat_number" name="vat_number" type="text">
+          <p class="admin-hint">Leave empty if you are not VAT registered and it will not appear at all.</p>
+        </div>
+        <div class="admin-field">
+          <label for="set-bank_account_name">Account name</label>
+          <input id="set-bank_account_name" name="bank_account_name" type="text">
+        </div>
+        <div class="admin-field">
+          <label for="set-bank_sort_code">Sort code</label>
+          <input id="set-bank_sort_code" name="bank_sort_code" type="text" placeholder="00-00-00">
+        </div>
+        <div class="admin-field">
+          <label for="set-bank_account_number">Account number</label>
+          <input id="set-bank_account_number" name="bank_account_number" type="text">
+        </div>
+        <div class="admin-field">
+          <label for="set-payment_terms_days">Payment due within (days)</label>
+          <input id="set-payment_terms_days" name="payment_terms_days" type="number" min="0" step="1">
+          <p class="admin-hint">Works out the due date when a job becomes an invoice.</p>
+        </div>
+
         <div class="admin-form__actions">
           <button class="btn btn--primary" type="submit">Save contact details</button>
         </div>
@@ -192,6 +382,24 @@
     </form>
   </dialog>
 
+  <!-- Every question and every warning. One dialog, in the middle of the
+       screen, rather than a mix of browser boxes and a banner at the top. -->
+  <dialog class="admin-dialog" id="ask-dialog">
+    <form method="dialog" class="admin-dialog__form">
+      <h2 id="ask-title">Are you sure?</h2>
+      <p id="ask-message"></p>
+      <div class="admin-field" id="ask-input-field" hidden>
+        <label for="ask-input" id="ask-input-label">Value</label>
+        <input id="ask-input" type="text">
+      </div>
+      <div class="admin-dialog__actions" id="ask-actions"></div>
+    </form>
+  </dialog>
+
+  <!-- Filled in when a quote or invoice is printed. Hidden on screen. -->
+  <div id="doc-print" aria-hidden="true"></div>
+
   <script src="/admin/admin.js"></script>
+  <script src="/admin/documents.js"></script>
 </body>
 </html>
