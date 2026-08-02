@@ -66,13 +66,27 @@ If the client already has a hand-built site, write a small extractor like
 `db/extract-seed.py` rather than retyping their content. It reads the existing
 HTML and emits the INSERTs, so nothing is lost or subtly reworded.
 
-**6. Access**
+**6. The login**
 
-Zero Trust → Access → Applications → Self-hosted, with destinations on
-`theirdomain.com` paths `admin` and `api`. Never add the bare domain with no
-path — that puts the public site behind the login.
+Either a username and password, which needs no dashboard setup:
 
-Copy the team domain and the Application Audience (AUD) tag into
+```bash
+npx wrangler d1 execute <site-name> --remote --file=db/migrations/003-admin-login.sql
+```
+
+```bash
+npm run set-password -- <username> --name "Their Name"
+```
+
+Or Cloudflare Access: Zero Trust → Access → Applications → Self-hosted, with
+destinations on `theirdomain.com` paths `admin` and `api`. Never add the bare
+domain with no path — that puts the public site behind the login.
+
+**Not both.** Access sits in front of the Worker, so while it covers `/admin`
+it intercepts the request before the password form is reached and blocks
+`POST /api/login`.
+
+For Access, copy the team domain and the Application Audience (AUD) tag into
 `[vars]` and deploy. **The AUD is 64 hex characters with no dashes; the policy
 ID is a UUID with dashes.** They are easy to confuse and only one of them works.
 

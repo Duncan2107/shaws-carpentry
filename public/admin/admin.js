@@ -46,7 +46,10 @@
     }, options));
 
     if (response.status === 403) {
-      throw new Error('Your session has expired. Refresh the page to sign in again.');
+      // The session has run out. /admin serves the sign-in form when there is
+      // no session, so going back there is the way to sign in again.
+      window.location.replace('/admin');
+      throw new Error('Your session has expired. Sign in again to carry on.');
     }
 
     var payload = null;
@@ -840,6 +843,17 @@
       // each visit so they are never stale.
       if (name === 'visitors') loadStats();
     });
+  });
+
+  /* ------------------------------------------------------------ sign out */
+
+  document.getElementById('sign-out').addEventListener('click', async function () {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } catch (err) {
+      // Nothing useful to do about it: go back to the sign-in page either way.
+    }
+    window.location.replace('/admin');
   });
 
   /* ---------------------------------------------------------------- load */

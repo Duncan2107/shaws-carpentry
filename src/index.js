@@ -21,7 +21,7 @@ import {
   serviceOptions,
   footerContact,
 } from './content.js';
-import { requireAdmin, json } from './auth.js';
+import { requireAdmin, handleLogin, handleLogout, json } from './auth.js';
 import { handleApi } from './api.js';
 import { recordView } from './analytics.js';
 
@@ -147,20 +147,33 @@ async function renderPage(request, env) {
 }
 
 /**
- * Shown when someone reaches /admin without a valid session.
+ * The sign-in screen, shown when someone reaches /admin without a session.
  *
- * In normal use Cloudflare Access presents its own sign-in screen first, so
- * this is the fallback for the workers.dev address and for before Access has
- * been configured. It explains the situation instead of showing a bare error.
+ * The form posts to /api/login and reloads on success, so a wrong password
+ * does not cost a page load. If the database is unreachable there is nothing
+ * to check a password against, so it says so rather than offering a form that
+ * cannot work.
  */
 function signInPage(status) {
-  const notConfigured = status === 503;
-  const message = notConfigured
-    ? 'The sign-in system has not been switched on for this site yet.'
-    : 'You need to sign in before you can manage the website.';
-  const detail = notConfigured
-    ? 'Once Cloudflare Access is set up, visiting this page will ask for your email address and send you a one-time code.'
-    : 'Reload this page and you will be asked for your email address. A one-time code will be sent to you, and no password is needed.';
+  const unavailable = status === 503;
+
+  const form = `
+    <form id="signin-form" novalidate>
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username"
+             autocapitalize="none" spellcheck="false" required autofocus>
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password"
+             autocomplete="current-password" required>
+
+      <p class="signin__error" id="signin-error" role="alert" hidden></p>
+      <button class="btn btn--primary" type="submit" id="signin-submit">Sign in</button>
+    </form>`;
+
+  const unavailableMessage = `
+    <p>Sign in is not available at the moment because the website's database
+       cannot be reached. Please try again shortly.</p>`;
 
   const html = `<!DOCTYPE html>
 <html lang="en-GB">
@@ -176,28 +189,78 @@ function signInPage(status) {
 <link rel="stylesheet" href="/css/styles.css">
 <style>
   body { display: grid; place-items: center; min-height: 100svh; padding: var(--space-3); }
-  .signin { max-width: 30rem; text-align: center; background: var(--white);
+  .signin { width: min(26rem, 100%); text-align: center; background: var(--white);
             border: 1px solid var(--line); border-radius: var(--radius);
             padding: var(--space-6) var(--space-4); box-shadow: var(--shadow-md); }
   .signin img { height: 4.5rem; width: auto; margin: 0 auto var(--space-3); }
   .signin h1 { font-size: 1.5rem; margin-bottom: var(--space-2); }
   .signin p { color: var(--text-muted); margin-bottom: var(--space-2); }
-  .signin .btn { margin-top: var(--space-2); }
+  .signin form { text-align: left; margin-top: var(--space-3); }
+  .signin label { display: block; font-size: 0.875rem; font-weight: 500;
+                  margin-bottom: 0.35rem; }
+  .signin input { width: 100%; padding: 0.7rem 0.85rem; margin-bottom: var(--space-2);
+                  border: 1px solid var(--line); border-radius: var(--radius-sm, 4px);
+                  font: inherit; background: var(--white); color: var(--text); }
+  .signin input:focus-visible { outline: 2px solid var(--accent, currentColor);
+                                outline-offset: 1px; }
+  .signin .btn { width: 100%; margin-top: var(--space-1, 0.5rem); }
+  .signin__error { color: #a12b2b; font-size: 0.9rem; margin-bottom: var(--space-2); }
+  .signin__back { margin-top: var(--space-3); font-size: 0.9rem; }
 </style>
 </head>
 <body>
   <main class="signin">
     <img src="/Media/logo.png" alt="Shaws Carpentry" width="260" height="228">
-    <h1>${message}</h1>
-    <p>${detail}</p>
-    <a class="btn btn--primary" href="/admin">Try again</a>
-    <p style="margin-top:var(--space-3)"><a href="/">Back to the website</a></p>
+    <h1>Sign in to manage your website</h1>
+    ${unavailable ? unavailableMessage : form}
+    <p class="signin__back"><a href="/">Back to the website</a></p>
   </main>
+<script>
+(function () {
+  var form = document.getElementById('signin-form');
+  if (!form) return;
+  var error = document.getElementById('signin-error');
+  var submit = document.getElementById('signin-submit');
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    error.hidden = true;
+    submit.disabled = true;
+    submit.textContent = 'Signing in\\u2026';
+
+    try {
+      var response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value
+        })
+      });
+      var payload = await response.json().catch(function () { return {}; });
+
+      if (response.ok) {
+        window.location.replace('/admin');
+        return;
+      }
+      error.textContent = payload.error || 'That username and password did not match.';
+    } catch (err) {
+      error.textContent = 'Could not reach the website. Check your connection and try again.';
+    }
+
+    error.hidden = false;
+    submit.disabled = false;
+    submit.textContent = 'Sign in';
+    document.getElementById('password').value = '';
+    document.getElementById('password').focus();
+  });
+})();
+</script>
 </body>
 </html>`;
 
   return new Response(html, {
-    status,
+    status: unavailable ? 503 : 200,
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
   });
 }
@@ -247,6 +310,13 @@ export default {
       return servePhoto(request, env, decodeURIComponent(path.slice('/img/'.length)));
     }
 
+    // Signing in and out are the two routes that cannot require a session.
+    // They look after themselves: see src/auth.js.
+    if (path === '/api/login' || path === '/api/logout') {
+      if (request.method !== 'POST') return json({ error: 'Use POST.' }, 405);
+      return path === '/api/login' ? await handleLogin(request, env) : handleLogout(request);
+    }
+
     if (path === '/api' || path.startsWith('/api/')) {
       const auth = await requireAdmin(request, env);
       if (!auth.ok) return auth.response;
@@ -256,9 +326,7 @@ export default {
     if (path === '/admin' || path.startsWith('/admin/')) {
       const auth = await requireAdmin(request, env);
       if (!auth.ok) {
-        // Access normally shows its own sign-in screen before the request
-        // ever reaches the Worker. Landing here means it arrived somewhere
-        // Access does not cover, or it is not set up yet.
+        // No session, so show the sign-in form rather than a bare error.
         return signInPage(auth.response.status);
       }
       // Let the asset server resolve /admin to admin/index.html itself, the

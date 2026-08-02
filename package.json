@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "set-password": "node db/set-admin-password.js"
   },
   "devDependencies": {
     "wrangler": "^4.115.0"

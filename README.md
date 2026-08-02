@@ -57,8 +57,9 @@ ANALYTICS_SALT=any-string-for-local-use
 ```
 
 `ADMIN_DEV_BYPASS` opens `/admin` without a login, so the admin can be worked
-on locally. It only ever exists in `.dev.vars`; on the deployed Worker the
-Cloudflare Access check is the only way in.
+on locally. Set it to anything other than `true` to exercise the real sign-in
+screen. It only ever exists in `.dev.vars`; on the deployed Worker the sign-in
+check is the only way in.
 
 Seed a local database:
 
@@ -69,6 +70,40 @@ npx wrangler d1 execute shaws-carpentry --local --file=db/schema.sql
 ```bash
 npx wrangler d1 execute shaws-carpentry --local --file=db/seed.sql
 ```
+
+## The admin login
+
+`/admin` and `/api` ask for a username and a password. The accounts live in
+the `admin_users` table and hold a PBKDF2-SHA256 hash, never the password
+itself. Create one, or change a password:
+
+```bash
+npm run set-password -- stuart --name "Stuart Shaw"
+```
+
+It asks for the password twice, then writes `db/admin-password.sql` with the
+statement to apply:
+
+```bash
+npx wrangler d1 execute shaws-carpentry --remote --file=db/admin-password.sql
+```
+
+Delete that file afterwards. It is git-ignored, so it will not be committed.
+
+Signing in sets a session cookie which the Worker signs and checks itself. It
+lasts 24 hours. The signing key comes from the stored password hash, so
+changing a password signs out every session that account had open. Ten wrong
+guesses on one username locks it for 15 minutes.
+
+The table is created by `db/migrations/003-admin-login.sql`, which has to be
+applied before anyone can sign in.
+
+> **If Cloudflare Access is still switched on for this domain it wins.** Access
+> sits in front of the Worker, so it will show its own sign-in screen and will
+> block `POST /api/login` before the password form is reached. Use one or the
+> other: to use passwords, remove the Access application in Zero Trust. The
+> Worker still accepts a valid Access token if `ACCESS_TEAM_DOMAIN` and
+> `ACCESS_AUD` are set, so an existing setup keeps working.
 
 ## Deploying
 

@@ -292,6 +292,48 @@ hard failure.
 
 ## 10. Turn on the login
 
+Two options. **Pick one, not both:** an Access application sits in front of
+the Worker, so while one covers `/admin` it intercepts every request before
+the Worker's own check runs, and it blocks `POST /api/login` as well.
+
+### 10a. A username and password (simpler)
+
+Nothing to configure in the dashboard. Apply the migration, then create the
+client's account:
+
+```bash
+npx wrangler d1 execute <site-name> --remote --file=db/migrations/003-admin-login.sql
+```
+
+```bash
+npm run set-password -- <username> --name "Their Name"
+```
+
+That prints the statement to apply, and never writes the password anywhere:
+
+```bash
+npx wrangler d1 execute <site-name> --remote --file=db/admin-password.sql
+```
+
+Delete `db/admin-password.sql` afterwards. Give the client the password by
+something better than email, and tell them a new one can be set any time by
+running the same command again.
+
+> On the **free** Cloudflare plan a Worker gets about 10ms of CPU per request,
+> and the default of 100,000 PBKDF2 iterations may exceed it. If signing in
+> fails with a CPU limit error, set the account up again with
+> `--iterations 10000` and deploy nothing: the count travels with the stored
+> hash.
+
+Then confirm:
+
+- `/admin` signed out shows the sign-in form
+- `/api/content` signed out returns 403
+- the right password gets in, and Sign out returns you to the form
+- all public pages still return 200
+
+### 10b. Cloudflare Access instead
+
 Zero Trust → Access → Applications → **Add an application → Self-hosted**,
 then the **Public DNS** option.
 
@@ -374,7 +416,8 @@ while looking configured.
 
 Show the client:
 
-- their admin URL, and that signing in means an emailed code, no password
+- their admin URL, and how they sign in: a username and password they can
+  save in their browser, or an emailed code if you set up Access instead
 - how to add a service and tick which pages it appears on
 - how to add a photo project, and that several photos become a carousel
 - how to publish a review, and that the "Reviews coming soon" message

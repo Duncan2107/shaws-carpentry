@@ -63,14 +63,30 @@ It is styled with the same design tokens as the public site, so it reads as
 part of the client's business rather than a generic control panel. Rebranding
 it is a matter of the CSS variables, not new markup.
 
-Sign-in is **Cloudflare Access**, not a password we store. The Worker verifies
-the token's signature, audience and issuer against the team's public keys
-(`src/auth.js`) rather than trusting the header Access adds — the Worker can be
-reachable on hostnames the Access policy does not cover, so a trusted-header
-approach is bypassable. Do not replace this with a hand-rolled login.
+Sign-in has two supported forms, both checked in `src/auth.js`, and both
+checked **inside the Worker**. That last part is the rule that does not bend:
+the Worker can be reachable on hostnames a policy in front of it does not
+cover, so anything that trusts a header it has not verified is bypassable.
+
+| Form | How it works |
+|---|---|
+| **Username and password** (default) | An account in `admin_users`, holding a PBKDF2-SHA256 hash and never a password. Signing in sets a session cookie that the Worker signs and verifies itself. |
+| **Cloudflare Access** | Used instead if `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are set and a valid token arrives. The Worker verifies the token's signature, audience and issuer against the team's public keys. |
+
+Accounts are created with `db/set-admin-password.js`, which prints the SQL to
+run and never writes a password anywhere. The session cookie is signed with a
+key derived from the stored hash, so changing a password signs out every
+session that account had open.
+
+**Access and the password login cannot both guard the same paths.** An Access
+application sits in front of the Worker, so while one covers `/admin` it will
+intercept the request before the password form is ever reached, and it will
+block `POST /api/login` too. Pick one. If you choose passwords, remove the
+Access application in Zero Trust.
 
 `ADMIN_DEV_BYPASS` in `.dev.vars` opens the admin locally. That file is
-git-ignored and never uploaded, so it cannot leak into a deployment.
+git-ignored and never uploaded, so it cannot leak into a deployment. Set it to
+anything other than `true` to exercise the real sign-in locally.
 
 ### The enquiry form
 
