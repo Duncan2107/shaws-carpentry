@@ -1169,14 +1169,43 @@ body.admin {
 }
 
 @media print {
-  /* A real page margin, applied to every sheet.
+  /* No page margin at all, which is the only thing that stops the browser
+     printing its own URL, date and page title around the document: it draws
+     them into the page margin, and there is no way to keep the page number
+     while dropping the rest.
+     The paper still needs a margin on every sheet, and that comes from the
+     table in the markup instead. Its heading and footer rows repeat on every
+     printed page, so their heights become the top and bottom margins.
      Padding on the container cannot do this job: it puts space at the top of
-     the first page and the bottom of the last one, and nothing in between, so
-     a second page began hard against the paper edge.
-     The cost is that the browser draws its own header and footer in this
-     margin unless "Headers and footers" is unticked in the print dialog. */
+     the first page and the bottom of the last one, and nothing in between. */
   @page {
-    margin: 14mm;
+    margin: 0;
+  }
+
+  #doc-print .sheet {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  #doc-print .sheet__top {
+    height: 14mm;
+  }
+
+  #doc-print .sheet__body {
+    padding: 0 14mm;
+    vertical-align: top;
+  }
+
+  /* Repeats at the foot of every sheet, so a second page is identifiable on
+     its own, and reserves the bottom margin at the same time. */
+  #doc-print .sheet__bottom {
+    height: 14mm;
+    padding: 2mm 14mm 0;
+    vertical-align: top;
+    border-top: 1px solid #ddd;
+    font-size: 0.75rem;
+    color: #555;
+    text-align: center;
   }
 
   /* Everything except the document itself is screen furniture. */
@@ -1198,14 +1227,6 @@ body.admin {
     padding: 0;
   }
 
-  #doc-print .running-foot {
-    margin-top: var(--space-3);
-    padding-top: 2mm;
-    border-top: 1px solid #ddd;
-    font-size: 0.75rem;
-    color: #555;
-    text-align: center;
-  }
 
   #doc-print .head {
     display: flex;
@@ -1326,16 +1347,17 @@ body.admin {
   }
 
   /* What must not be cut in half by a page break. A task keeps its heading,
-     its materials and its total together; the money at the end stays whole. */
+     its materials and its total together; the money at the end stays whole.
+     Scoped inside the body cell on purpose: the same rule on the sheet itself
+     would ask the browser to keep the entire document on one page. */
   #doc-print .head,
   #doc-print .who,
   #doc-print .task,
   #doc-print .totals,
   #doc-print .pay,
   #doc-print .notes,
-  #doc-print .running-foot,
-  #doc-print table,
-  #doc-print tr {
+  #doc-print .sheet__body table,
+  #doc-print .sheet__body tr {
     break-inside: avoid;
   }
 

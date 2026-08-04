@@ -628,7 +628,18 @@
         '<p>Please quote ' + esc(current.ref) + ' with your payment.</p></div>';
     }
 
+    // The whole document sits in a table with an empty heading row and a
+    // footer row. A browser repeats those on every printed sheet, which is
+    // what gives the paper its top and bottom margin. A page margin would do
+    // the same job, but the browser draws its own URL, date and title into a
+    // page margin, and there is no way to keep one without the other.
+    var footer = [setting('business_name', ''), type.heading.toLowerCase() + ' ' + current.ref]
+      .filter(Boolean).join(' · ');
+
     document.getElementById('doc-print').innerHTML =
+      '<table class="sheet"><thead><tr><td class="sheet__top"></td></tr></thead>' +
+      '<tbody><tr><td class="sheet__body">' +
+
       '<div class="head">' +
         '<div>' +
           '<img src="/Media/logo.png" alt="" width="260" height="228">' +
@@ -668,10 +679,9 @@
       payment +
       (current.notes ? '<div class="notes"><strong>Notes</strong><br>' + esc(current.notes) + '</div>' : '') +
 
-      // Repeated at the foot of every page by the print stylesheet, so a
-      // second sheet is still identifiable on its own.
-      '<div class="running-foot">' + esc(setting('business_name', '')) + ' · ' +
-        esc(type.heading.toLowerCase()) + ' ' + esc(current.ref) + '</div>';
+      '</td></tr></tbody>' +
+      '<tfoot><tr><td class="sheet__bottom">' + esc(footer) + '</td></tr></tfoot>' +
+      '</table>';
   }
 
   var printingFromButton = false;
