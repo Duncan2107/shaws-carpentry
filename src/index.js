@@ -21,6 +21,9 @@ import {
   serviceOptions,
   footerContact,
 } from './content.js';
+import { sitemap, robots } from './sitemap.js';
+import { addMetaTags, canonicalOrigin } from './meta.js';
+import { structuredData, StructuredData } from './schema.js';
 import { requireAdmin, handleLogin, handleLogout, json } from './auth.js';
 import { handleApi } from './api.js';
 import { recordView } from './analytics.js';
@@ -30,7 +33,18 @@ import { recordView } from './analytics.js';
 // files may have changed.
 const BOOT_ID = Date.now().toString(36);
 
-/** Paths whose HTML gets content injected. */
+/** The deployment id, which is what the CSS and JS URLs are stamped with. */
+function assetVersion(env) {
+  return (env.CF_VERSION && env.CF_VERSION.id ? env.CF_VERSION.id : BOOT_ID).slice(0, 8);
+}
+
+/**
+ * Paths whose HTML gets content injected.
+ *
+ * The .html forms are the legacy addresses, kept working because links to
+ * them exist. A new page needs adding to PAGES in sitemap.js as well, or it
+ * will render but never be listed for a search engine.
+ */
 const PAGES = new Set([
   '/',
   '/index.html',
@@ -96,10 +110,12 @@ class SetFormEndpoint {
   }
 }
 
-function buildRewriter(content, assetVersion) {
+function buildRewriter(content, assetVersion, url, path) {
   const reviews = testimonialsGrid(content);
+  const origin = canonicalOrigin(url);
 
-  return new HTMLRewriter()
+  return addMetaTags(new HTMLRewriter(), url, origin + path, content.setting.business_name)
+    .on('head', new StructuredData(structuredData(content, origin, path)))
     .on('link[rel="stylesheet"][href^="/css/"]', new VersionAssets(assetVersion))
     .on('script[src^="/js/"]', new VersionAssets(assetVersion))
     .on('[data-content="services-domestic"]', new SetInner(servicesGrid(content, 'domestic')))
@@ -119,7 +135,7 @@ function buildRewriter(content, assetVersion) {
     );
 }
 
-async function renderPage(request, env) {
+async function renderPage(request, env, url, path) {
   // Ask the asset server for this exact path. Requesting the underlying
   // "*.html" file instead would come back as a 307 to the extensionless URL,
   // which is also why legacy /services.html links simply pass through here.
@@ -142,8 +158,48 @@ async function renderPage(request, env) {
 
   const response = new Response(assetResponse.body, assetResponse);
   response.headers.set('Cache-Control', 'no-cache');
-  const assetVersion = (env.CF_VERSION && env.CF_VERSION.id ? env.CF_VERSION.id : BOOT_ID).slice(0, 8);
-  return buildRewriter(content, assetVersion).transform(response);
+  return buildRewriter(content, assetVersion(env), url, path).transform(response);
+}
+
+/**
+ * The page for an address that does not exist.
+ *
+ * public/404.html, fetched from the asset server and returned with a 404
+ * status. It gets the versioned asset URLs and the footer's live contact
+ * details, but none of the canonical, Open Graph or structured data tags the
+ * real pages carry: this page stands for no particular address, so describing
+ * it to a search engine would be wrong.
+ */
+async function notFound(request, env, url) {
+  // A missing image or script wants a 404, not a rendered page, and should not
+  // cost a database read. Only a navigation gets the full thing, which also
+  // stops a bot walking random addresses running up queries.
+  const accept = request.headers.get('accept') || '';
+  if (!accept.includes('text/html')) return new Response('Not found.', { status: 404 });
+
+  const page = await env.ASSETS.fetch(new Request(new URL('/404', url)));
+  if (!page.ok) return new Response('Not found.', { status: 404 });
+
+  const source = new Response(page.body, {
+    status: 404,
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' },
+  });
+
+  let content;
+  try {
+    content = await loadContent(env);
+  } catch (err) {
+    // The static page carries readable contact details of its own, so it is
+    // still a usable page with the database unreachable.
+    console.error('content load failed, serving static 404', err);
+    return source;
+  }
+
+  return new HTMLRewriter()
+    .on('link[rel="stylesheet"][href^="/css/"]', new VersionAssets(assetVersion(env)))
+    .on('script[src^="/js/"]', new VersionAssets(assetVersion(env)))
+    .on('[data-content="footer-contact"]', new SetInner(footerContact(content)))
+    .transform(source);
 }
 
 /**
@@ -310,6 +366,11 @@ export default {
       return servePhoto(request, env, decodeURIComponent(path.slice('/img/'.length)));
     }
 
+    // Both are generated from the request's own origin, so they are correct on
+    // whatever domain the Worker is answering on. See src/sitemap.js.
+    if (path === '/sitemap.xml') return sitemap(env, url);
+    if (path === '/robots.txt') return robots(url);
+
     // Signing in and out are the two routes that cannot require a session.
     // They look after themselves: see src/auth.js.
     if (path === '/api/login' || path === '/api/logout') {
@@ -343,9 +404,19 @@ export default {
       if (request.method === 'GET') {
         ctx.waitUntil(recordView(request, env, url));
       }
-      return renderPage(request, env);
+      // The normalised path, not the requested one, so the canonical address
+      // is the same however the request was written. The asset server already
+      // redirects /services/ and /services.html, so this is a second line of
+      // defence rather than the only one.
+      return renderPage(request, env, url, path);
     }
 
-    return env.ASSETS.fetch(request);
+    // The 404 page stands for no address of its own, so asking for it directly
+    // still answers 404. Otherwise it would be a page returning 200 to say a
+    // page does not exist, which is exactly what a soft 404 is.
+    if (path === '/404' || path === '/404.html') return notFound(request, env, url);
+
+    const response = await env.ASSETS.fetch(request);
+    return response.status === 404 ? notFound(request, env, url) : response;
   },
 };

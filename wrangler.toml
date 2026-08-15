@@ -30,6 +30,11 @@ custom_domain = true
 [assets]
 directory = "./public"
 binding = "ASSETS"
+# not_found_handling is deliberately left at its default of "none". Setting it
+# to "404-page" makes the asset server answer a missing address by itself, and
+# the Worker never runs, so the page cannot have the footer's live contact
+# details put into it and /404 starts answering 200. The Worker serves
+# public/404.html instead: see notFound() in src/index.js.
 # The Worker must run before the asset server for the HTML pages, so it can
 # inject content from D1. Everything else (CSS, JS, images) is served straight
 # from the asset server, which is faster and not billed as a request.
@@ -42,6 +47,10 @@ run_worker_first = [
   "/gallery.html",
   "/contact",
   "/contact.html",
+  # So the Worker can answer these with a 404 rather than letting the asset
+  # server hand back the page with a 200. See notFound() in src/index.js.
+  "/404",
+  "/404.html",
   # The admin area and its API must never be served straight from the asset
   # server, or the sign-in check would be skipped.
   "/admin",
