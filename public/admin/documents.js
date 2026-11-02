@@ -86,6 +86,20 @@
   function taskMatsCharge(t) {
     return t.materials.reduce(function (s, m) { return s + matCharge(m); }, 0);
   }
+
+  /**
+   * How much of a material line is exempt from CIS.
+   *
+   * HMRC exempts only what the materials cost you. Any markup on them counts
+   * as labour and has CIS taken off it. A material priced by hand with no
+   * cost entered is therefore all labour. And the exemption can never be more
+   * than was charged for it, so materials sold at a loss exempt what the
+   * customer pays, not what they cost.
+   */
+  function matCisExempt(m) { return Math.min(matCost(m), matCharge(m)); }
+  function taskMatsCisExempt(t) {
+    return t.materials.reduce(function (s, m) { return s + matCisExempt(m); }, 0);
+  }
   function taskTotal(t) { return taskLabour(t) + taskMatsCharge(t); }
 
   function calc(doc) {
@@ -94,14 +108,70 @@
     var matsCharge = tasks.reduce(function (s, t) { return s + taskMatsCharge(t); }, 0);
     var labour = tasks.reduce(function (s, t) { return s + taskLabour(t); }, 0);
     var subtotal = matsCharge + labour;
-    var vat = subtotal * ((+doc.vat_rate || 0) / 100);
+    // An overall deduction comes off before VAT, so the VAT is charged on what
+    // the customer is actually paying for. It is either pounds or a percentage
+    // of the subtotal. Empty means nothing is taken off.
+    var deduction = doc.deduction_type === 'percent'
+      ? subtotal * ((+doc.deduction || 0) / 100)
+      : +doc.deduction || 0;
+    var net = subtotal - deduction;
+    var vat = net * ((+doc.vat_rate || 0) / 100);
+
+    // Under the domestic reverse charge the VAT is still worked out and shown,
+    // but the contractor pays it to HMRC, so it is not part of what they owe
+    // you. It only ever applies to a CIS job.
+    // CIS is only ever on an invoice.
+    var isCis = !!doc.cis && doc.doc_type === 'invoice';
+    var reverse = !!(isCis && doc.reverse_charge);
+    var total = net + (reverse ? 0 : vat);
+
+    // CIS comes off the labour, which includes any markup on materials. It
+    // never comes off what the materials cost you, or the VAT. Any overall
+    // deduction is shared out in proportion, so the figure is what is
+    // actually being charged.
+    var cisRate = isCis ? (+doc.cis_rate || 0) : 0;
+    var matsCisExempt = tasks.reduce(function (s, t) { return s + taskMatsCisExempt(t); }, 0);
+    var cisSubject = subtotal - matsCisExempt;
+    var cisLabour = isCis && subtotal > 0 ? cisSubject * (net / subtotal) : 0;
+    // To the penny, so the printed lines add up to the net payable exactly.
+    var cisDeduction = Math.round(cisLabour * cisRate) / 100;
+
     return {
       matsCost: matsCost, matsCharge: matsCharge, matsProfit: matsCharge - matsCost,
-      labour: labour, subtotal: subtotal, vat: vat, total: subtotal + vat,
+      labour: labour, subtotal: subtotal, deduction: deduction, net: net,
+      vat: vat, cis: isCis, reverse: reverse, total: total,
+      cisRate: cisRate, cisLabour: cisLabour, cisDeduction: cisDeduction,
+      // What the customer actually sends you. The same as the total unless
+      // CIS is being deducted.
+      payable: total - cisDeduction,
     };
   }
 
   /* --------------------------------------------------------------- helpers */
+
+  // What is printed against the deduction: the words typed in, or a plain
+  // description if none were.
+  function deductionLabel(doc) {
+    if (doc.deduction_label) return doc.deduction_label;
+    return doc.deduction_type === 'percent'
+      ? 'Less deduction (' + (+doc.deduction || 0) + '%)'
+      : 'Less deduction';
+  }
+
+  // CIS is for invoices only, and its options only show once it is ticked.
+  function syncCisFields() {
+    document.getElementById('doc-cis-section').hidden = current.doc_type !== 'invoice';
+    document.getElementById('doc-cis-fields').hidden = !current.cis;
+  }
+
+  // The amount box is pounds or a percentage, and its label says which.
+  function syncDeductionUnit() {
+    var percent = current.deduction_type === 'percent';
+    document.getElementById('doc-deduction-unit').textContent = percent ? 'Percentage (%)' : 'Amount (£)';
+    var input = document.getElementById('doc-deduction');
+    if (percent) input.max = '100';
+    else input.removeAttribute('max');
+  }
 
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -288,6 +358,8 @@
       issue_date: today(), due_date: null,
       title: '', customer_name: '', customer_phone: '', customer_email: '',
       job_address: '', notes: '', vat_rate: num('quote_vat', 20),
+      deduction: 0, deduction_type: 'amount', deduction_label: '',
+      cis: 0, cis_rate: 20, reverse_charge: 0,
       price_view: 'full', tasks: [],
     };
   }
@@ -409,8 +481,22 @@
 
   function renderTotals() {
     var c = calc(current);
-    var vatLine = current.vat_rate
-      ? '<div class="admin-tot"><span>VAT at ' + esc(current.vat_rate) + '%</span><span>' + money(c.vat) + '</span></div>'
+    var vatLine = !current.vat_rate ? ''
+      : c.reverse
+        ? '<div class="admin-tot"><span>VAT at ' + esc(current.vat_rate) + '%, reverse charge (not added)</span><span>' + money(c.vat) + '</span></div>'
+        : '<div class="admin-tot"><span>VAT at ' + esc(current.vat_rate) + '%</span><span>' + money(c.vat) + '</span></div>';
+    // A CIS job ends on what the contractor actually pays, after their
+    // deduction, rather than on the total.
+    var endLines = c.cis
+      ? '<div class="admin-tot"><span>Gross amount</span><span>' + money(c.total) + '</span></div>' +
+        '<div class="admin-tot"><span>Less CIS deduction (' + c.cisRate + '% of ' + money(c.cisLabour) +
+          ')</span><span>-' + money(c.cisDeduction) + '</span></div>' +
+        '<div class="admin-tot admin-tot--big"><span>Net payable</span><span>' + money(c.payable) + '</span></div>'
+      : '<div class="admin-tot admin-tot--big"><span>Total</span><span>' + money(c.total) + '</span></div>';
+    // Only there when something is being taken off.
+    var deductionLines = c.deduction
+      ? '<div class="admin-tot"><span>' + esc(deductionLabel(current)) + '</span><span>-' + money(c.deduction) + '</span></div>' +
+        '<div class="admin-tot"><span>After deduction</span><span>' + money(c.net) + '</span></div>'
       : '';
     document.getElementById('doc-totals').innerHTML =
       '<div class="admin-tot"><span>Materials cost you</span><span>' + money(c.matsCost) + '</span></div>' +
@@ -418,8 +504,9 @@
       '<div class="admin-tot"><span>Profit on materials</span><span class="admin-tot__profit">' + money(c.matsProfit) + '</span></div>' +
       '<div class="admin-tot"><span>Labour</span><span>' + money(c.labour) + '</span></div>' +
       '<div class="admin-tot"><span>Subtotal</span><span>' + money(c.subtotal) + '</span></div>' +
+      deductionLines +
       vatLine +
-      '<div class="admin-tot admin-tot--big"><span>Total</span><span>' + money(c.total) + '</span></div>';
+      endLines;
   }
 
   function renderBuilder() {
@@ -442,6 +529,15 @@
     document.getElementById('doc-job_address').value = current.job_address || '';
     document.getElementById('doc-notes').value = current.notes || '';
     document.getElementById('doc-vat_rate').value = current.vat_rate || 0;
+    // Left empty rather than showing 0, so a job with no deduction looks it.
+    document.getElementById('doc-deduction').value = current.deduction || '';
+    document.getElementById('doc-deduction_type').value = current.deduction_type || 'amount';
+    document.getElementById('doc-deduction_label').value = current.deduction_label || '';
+    syncDeductionUnit();
+    document.getElementById('doc-cis').checked = !!current.cis;
+    document.getElementById('doc-cis_rate').value = String(current.cis_rate === undefined ? 20 : +current.cis_rate);
+    document.getElementById('doc-reverse_charge').checked = !!current.reverse_charge;
+    syncCisFields();
     document.getElementById('doc-price_view').value = current.price_view || 'full';
 
     document.getElementById('doc-status').innerHTML = type.statuses.map(function (s) {
@@ -470,6 +566,12 @@
     current.job_address = document.getElementById('doc-job_address').value;
     current.notes = document.getElementById('doc-notes').value;
     current.vat_rate = Number(document.getElementById('doc-vat_rate').value) || 0;
+    current.deduction = Number(document.getElementById('doc-deduction').value) || 0;
+    current.deduction_type = document.getElementById('doc-deduction_type').value;
+    current.deduction_label = document.getElementById('doc-deduction_label').value.trim();
+    current.cis = document.getElementById('doc-cis').checked ? 1 : 0;
+    current.cis_rate = Number(document.getElementById('doc-cis_rate').value);
+    current.reverse_charge = document.getElementById('doc-reverse_charge').checked ? 1 : 0;
     current.price_view = document.getElementById('doc-price_view').value;
   }
 
@@ -611,6 +713,7 @@
     }).join('');
 
     var vatNumber = setting('vat_number', '');
+    var utr = setting('utr', '');
     var terms = Math.trunc(num('payment_terms_days', 14));
 
     var payment = '';
@@ -648,6 +751,8 @@
           '<p>' + esc(setting('phone_display', '')) + '</p>' +
           '<p>' + esc(setting('email', '')) + '</p>' +
           (isInvoice && vatNumber ? '<p>VAT number ' + esc(vatNumber) + '</p>' : '') +
+          // The contractor checks CIS status against it with HMRC.
+          (c.cis && utr ? '<p>UTR ' + esc(utr) + '</p>' : '') +
         '</div>' +
         '<div class="meta">' +
           '<p class="kind">' + esc(type.heading) + '</p>' +
@@ -670,11 +775,28 @@
           '<div><span>Materials</span><span>' + money(c.matsCharge) + '</span></div>' +
           '<div><span>Labour</span><span>' + money(c.labour) + '</span></div>') +
         '<div><span>Subtotal</span><span>' + money(c.subtotal) + '</span></div>' +
-        (current.vat_rate
-          ? '<div><span>VAT at ' + esc(current.vat_rate) + '%</span><span>' + money(c.vat) + '</span></div>'
+        // Shown at every level of detail: it is part of how the total was
+        // reached, not part of the breakdown.
+        (c.deduction
+          ? '<div><span>' + esc(deductionLabel(current)) + '</span><span>-' + money(c.deduction) + '</span></div>' +
+            '<div><span>After deduction</span><span>' + money(c.net) + '</span></div>'
           : '') +
-        '<div class="grand"><span>Total</span><span>' + money(c.total) + '</span></div>' +
+        (!current.vat_rate ? ''
+          : c.reverse
+            ? '<div><span>VAT at ' + esc(current.vat_rate) + '% under the reverse charge, not added</span><span>' + money(c.vat) + '</span></div>'
+            : '<div><span>VAT at ' + esc(current.vat_rate) + '%</span><span>' + money(c.vat) + '</span></div>') +
+        (c.cis
+          ? '<div><span>Gross amount</span><span>' + money(c.total) + '</span></div>' +
+            '<div><span>Less CIS deduction (' + c.cisRate + '% of ' + money(c.cisLabour) +
+              ')</span><span>-' + money(c.cisDeduction) + '</span></div>' +
+            '<div class="grand"><span>Net payable</span><span>' + money(c.payable) + '</span></div>'
+          : '<div class="grand"><span>Total</span><span>' + money(c.total) + '</span></div>') +
       '</div>' +
+
+      (c.reverse && current.vat_rate
+        ? '<div class="notes"><strong>Reverse charge: customer to pay the VAT to HMRC.</strong><br>' +
+          'VAT at ' + esc(current.vat_rate) + '% due under the domestic reverse charge: ' + money(c.vat) + '.</div>'
+        : '') +
 
       payment +
       (current.notes ? '<div class="notes"><strong>Notes</strong><br>' + esc(current.notes) + '</div>' : '') +
@@ -846,6 +968,32 @@
       dirty = true;
       if (e.target.id === 'doc-vat_rate') {
         current.vat_rate = Number(e.target.value) || 0;
+        renderTotals();
+      }
+      if (e.target.id === 'doc-deduction') {
+        current.deduction = Number(e.target.value) || 0;
+        renderTotals();
+      }
+      if (e.target.id === 'doc-deduction_type') {
+        current.deduction_type = e.target.value;
+        syncDeductionUnit();
+        renderTotals();
+      }
+      if (e.target.id === 'doc-deduction_label') {
+        current.deduction_label = e.target.value.trim();
+        renderTotals();
+      }
+      if (e.target.id === 'doc-cis') {
+        current.cis = e.target.checked ? 1 : 0;
+        syncCisFields();
+        renderTotals();
+      }
+      if (e.target.id === 'doc-cis_rate') {
+        current.cis_rate = Number(e.target.value);
+        renderTotals();
+      }
+      if (e.target.id === 'doc-reverse_charge') {
+        current.reverse_charge = e.target.checked ? 1 : 0;
         renderTotals();
       }
       return;
@@ -1024,6 +1172,12 @@
       job_address: current.job_address,
       notes: current.notes,
       vat_rate: current.vat_rate,
+      deduction: current.deduction,
+      deduction_type: current.deduction_type,
+      deduction_label: current.deduction_label,
+      cis: current.cis,
+      cis_rate: current.cis_rate,
+      reverse_charge: current.reverse_charge,
       price_view: current.price_view,
       tasks: current.tasks,
     };

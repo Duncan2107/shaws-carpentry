@@ -72,6 +72,17 @@ const COLLECTIONS = {
       job_address: { type: 'text', max: 300, default: '' },
       notes: { type: 'text', max: 4000, default: '' },
       vat_rate: { type: 'number', min: 0, max: 100, default: 0 },
+      // Taken off the subtotal, before VAT: pounds, or a percentage of it.
+      // 0 takes nothing off and prints nothing. See checkDeduction and
+      // db/migrations/005-document-deduction.sql.
+      deduction: { type: 'number', min: 0, max: 1000000, default: 0 },
+      deduction_type: { type: 'enum', values: ['amount', 'percent'], default: 'amount' },
+      deduction_label: { type: 'text', max: 80, default: '' },
+      // The Construction Industry Scheme. The rate is only 0, 20 or 30: see
+      // checkCis.
+      cis: { type: 'bool', default: 0 },
+      cis_rate: { type: 'number', min: 0, max: 30, default: 20 },
+      reverse_charge: { type: 'bool', default: 0 },
       price_view: { type: 'enum', values: ['full', 'summary', 'totals'], default: 'full' },
       tasks: { type: 'json', maxBytes: 100000, default: '[]' },
       sort_order: { type: 'int', default: 0 },
@@ -125,6 +136,7 @@ const SETTING_KEYS = new Set([
   'business_name',
   'business_address',
   'vat_number',
+  'utr',
   'bank_account_name',
   'bank_sort_code',
   'bank_account_number',
@@ -370,6 +382,21 @@ function checkStatus(docType, status) {
   return status;
 }
 
+// The field rules cannot see one another, and a percentage over 100 would
+// take off more than the job is worth.
+function checkDeduction(row) {
+  if (row.deduction_type === 'percent' && row.deduction > 100) {
+    throw new ValidationError('A percentage deduction cannot be more than 100%.');
+  }
+}
+
+// HMRC sets three CIS rates and nothing in between.
+function checkCis(row) {
+  if (row.cis_rate !== undefined && ![0, 20, 30].includes(row.cis_rate)) {
+    throw new ValidationError('The CIS rate must be 20%, 30% or 0%.');
+  }
+}
+
 /**
  * The next reference for a kind of document, counted per year.
  *
@@ -576,6 +603,8 @@ export async function handleApi(request, env, path) {
       if (collection.issuesRefs) {
         const docType = row.doc_type || 'quote';
         row.status = checkStatus(docType, row.status);
+        checkDeduction(row);
+        checkCis(row);
         if (!row.issue_date) row.issue_date = todayIso();
         if (!row.due_date) row.due_date = null;
         // The reference the client chose is also the one it holds at this
@@ -623,6 +652,8 @@ export async function handleApi(request, env, path) {
       if (collection.issuesRefs) {
         // Changing type is what /convert is for.
         delete row.doc_type;
+        checkDeduction(row);
+        checkCis(row);
         if (row.status !== undefined || row.ref !== undefined) {
           const existing = await env.DB.prepare('SELECT doc_type FROM documents WHERE id = ?')
             .bind(numericId)
