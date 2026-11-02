@@ -223,7 +223,49 @@
               </select>
             </div>
           </div>
+          <div class="admin-grid">
+            <div class="admin-field">
+              <label for="doc-deduction_label">Deduction wording</label>
+              <input id="doc-deduction_label" type="text" maxlength="80" placeholder="Less deduction">
+            </div>
+            <div class="admin-field">
+              <label for="doc-deduction_type">Deduct</label>
+              <select id="doc-deduction_type">
+                <option value="amount">A fixed amount (£)</option>
+                <option value="percent">A percentage (%)</option>
+              </select>
+            </div>
+            <div class="admin-field">
+              <label for="doc-deduction" id="doc-deduction-unit">Amount (£)</label>
+              <input id="doc-deduction" type="number" step="0.01" min="0" placeholder="None">
+            </div>
+          </div>
+          <!-- Invoices only: CIS is deducted when the contractor pays. -->
+          <div id="doc-cis-section" hidden>
+            <div class="admin-check">
+              <input type="checkbox" id="doc-cis">
+              <label for="doc-cis">This is a CIS job (Construction Industry Scheme)</label>
+            </div>
+            <div id="doc-cis-fields" hidden>
+              <div class="admin-grid">
+                <div class="admin-field">
+                  <label for="doc-cis_rate">CIS rate</label>
+                  <select id="doc-cis_rate">
+                    <option value="20">20% (registered for CIS)</option>
+                    <option value="30">30% (not registered for CIS)</option>
+                    <option value="0">0% (gross payment status)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="admin-check">
+                <input type="checkbox" id="doc-reverse_charge">
+                <label for="doc-reverse_charge">Reverse charge VAT (the contractor pays the VAT to HMRC instead of you)</label>
+              </div>
+              <p class="admin-hint">CIS is taken off your labour and any markup on materials. It is not taken off what the materials cost you, or the VAT, so make sure every material has its cost filled in.</p>
+            </div>
+          </div>
           <div id="doc-totals"></div>
+          <p class="admin-hint">A deduction comes off the subtotal before VAT is added. The wording is what the customer sees against it. Leave the amount empty and nothing is taken off.</p>
           <p class="admin-hint">Cost price and profit are for you alone. They never appear on the copy you print for the customer.</p>
         </div>
 
@@ -296,6 +338,11 @@
           <label for="set-vat_number">VAT number</label>
           <input id="set-vat_number" name="vat_number" type="text">
           <p class="admin-hint">Leave empty if you are not VAT registered and it will not appear at all.</p>
+        </div>
+        <div class="admin-field">
+          <label for="set-utr">Unique Taxpayer Reference (UTR)</label>
+          <input id="set-utr" name="utr" type="text">
+          <p class="admin-hint">Printed on CIS quotes and invoices only, so the contractor can check your CIS status with HMRC.</p>
         </div>
         <div class="admin-field">
           <label for="set-bank_account_name">Account name</label>
